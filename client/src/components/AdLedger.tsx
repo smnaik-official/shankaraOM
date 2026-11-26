@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { apiBatchSave } from '../services/api';
 import {
   Plus,
   Trash2,
@@ -118,10 +119,11 @@ const AdLedger = () => {
     };
   }, [exportDropdownOpen]);
 
-  // Persist to local storage
+  // Persist to local storage & sync to Atlas
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_AD_LEDGER, JSON.stringify(adSpends));
+      apiBatchSave('ad_ledger', adSpends).catch(console.warn);
     } catch (e) {
       console.error('Failed to save ad ledger:', e);
     }

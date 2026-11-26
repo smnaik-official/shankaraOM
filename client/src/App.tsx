@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './layouts/Layout';
 import Dashboard from './components/Dashboard';
@@ -16,8 +17,13 @@ import ProposalsList from './components/ProposalsList';
 import { Quotations } from './components/Quotations';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import { initializeCloudSync } from './services/api';
 
 function App() {
+  useEffect(() => {
+    initializeCloudSync();
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

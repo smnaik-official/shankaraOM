@@ -121,3 +121,88 @@ export async function syncAllFromMongo(): Promise<Record<string, any> | null> {
   }
   return null;
 }
+
+// Storage Key Mappings for 2-way Cloud Sync
+export const COLLECTION_KEYS: Record<string, string> = {
+  invoices: 'invoice_admin_invoices',
+  recurring_templates: 'invoice_admin_recurring_templates',
+  credit_notes: 'invoice_admin_credit_notes',
+  clients: 'invoice_admin_clients',
+  expenses: 'business_expenses_data',
+  subscriptions: 'admin_panel_subscriptions',
+  compliances: 'invoice_admin_compliances',
+  billing_profiles: 'invoice_admin_profiles',
+  employees: 'invoice_admin_employees',
+  ad_ledger: 'invoice_admin_ad_ledger',
+  proposals: 'invoice_admin_proposals',
+};
+
+export const COLLECTION_EVENTS: Record<string, string> = {
+  invoices: 'invoices_updated',
+  recurring_templates: 'recurring_invoices_updated',
+  credit_notes: 'credit_notes_updated',
+  clients: 'clients_updated',
+  expenses: 'expenses_updated',
+  subscriptions: 'subscriptions_updated',
+  compliances: 'compliances_updated',
+  billing_profiles: 'profile_updated',
+  employees: 'employees_updated',
+  ad_ledger: 'ad_ledger_updated',
+  proposals: 'proposals_updated',
+};
+
+// Two-way synchronization on app load
+export async function initializeCloudSync(): Promise<void> {
+  try {
+    const status = await checkDatabaseHealth();
+    if (!status.connected) {
+      console.warn('[Cloud Sync] Backend or MongoDB Atlas is offline. Running in local cache mode.');
+      return;
+    }
+
+    const remoteData = await syncAllFromMongo();
+    if (!remoteData) return;
+
+    for (const [collection, key] of Object.entries(COLLECTION_KEYS)) {
+      const remoteItems = remoteData[collection];
+      const localRaw = localStorage.getItem(key);
+      let localItems: any[] = [];
+      try {
+        if (localRaw) localItems = JSON.parse(localRaw);
+      } catch (e) {}
+
+      if (Array.isArray(remoteItems)) {
+        // Merge local & remote by ID or name
+        const mergedMap = new Map<string, any>();
+        remoteItems.forEach((item) => {
+          const id = item.id || item.name || JSON.stringify(item);
+          mergedMap.set(id, item);
+        });
+
+        // Retain local items created offline (like 'Test Client')
+        if (Array.isArray(localItems)) {
+          localItems.forEach((item) => {
+            const id = item.id || item.name || JSON.stringify(item);
+            mergedMap.set(id, item);
+          });
+        }
+
+        const merged = Array.from(mergedMap.values());
+        localStorage.setItem(key, JSON.stringify(merged));
+
+        // Push any local offline additions back to MongoDB Atlas
+        if (merged.length > remoteItems.length) {
+          apiBatchSave(collection, merged);
+        }
+
+        const evt = COLLECTION_EVENTS[collection];
+        if (evt) {
+          window.dispatchEvent(new Event(evt));
+        }
+      }
+    }
+    console.log('[Cloud Sync] Two-way synchronization with MongoDB Atlas completed.');
+  } catch (err) {
+    console.error('[Cloud Sync] Initialization error:', err);
+  }
+}

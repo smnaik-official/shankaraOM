@@ -1,3 +1,5 @@
+import { apiBatchSave } from '../services/api';
+
 export interface Expense {
   id: string;
   description: string;
@@ -197,6 +199,7 @@ export const getStoredExpenses = (): Expense[] => {
 export const saveStoredExpenses = (expenses: Expense[]) => {
   try {
     localStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(expenses));
+    apiBatchSave('expenses', expenses).catch(console.warn);
   } catch (e) {
     console.error('Failed to save expenses:', e);
   }

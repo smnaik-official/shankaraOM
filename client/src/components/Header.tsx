@@ -17,7 +17,7 @@ import {
   Database,
 } from 'lucide-react';
 import { logoutUser } from '../utils/auth';
-import { checkDatabaseHealth, DatabaseStatus } from '../services/api';
+import { checkDatabaseHealth, DatabaseStatus, initializeCloudSync } from '../services/api';
 import {
   AlertNotification,
   getActiveNotifications,
@@ -177,15 +177,21 @@ const Header: React.FC = () => {
       <div className="flex items-center gap-3">
         {/* MongoDB Cloud Live Status */}
         <div
-          className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border shadow-2xs transition-all ${
+          onClick={() => {
+            checkDatabaseHealth().then((s) => {
+              setDbStatus(s);
+              if (s.connected) initializeCloudSync();
+            });
+          }}
+          className={`cursor-pointer select-none hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border shadow-2xs transition-all ${
             dbStatus?.connected
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              : 'bg-amber-50 text-amber-800 border-amber-200'
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+              : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
           }`}
           title={
             dbStatus?.connected
-              ? `Connected to MongoDB Atlas: ${dbStatus.cluster}\nDatabase: ${dbStatus.database}`
-              : 'MongoDB Atlas connecting / Local Cache Active'
+              ? `Connected to MongoDB Atlas: ${dbStatus.cluster}\nDatabase: ${dbStatus.database} (${dbStatus.pingMs}ms)\nClick to re-verify cloud sync.`
+              : 'Backend server is unreachable / Local Cache Active.\nClick to re-try connection.'
           }
         >
           <span className="relative flex h-2 w-2">

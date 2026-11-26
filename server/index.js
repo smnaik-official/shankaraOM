@@ -258,14 +258,14 @@ app.post('/api/:collection/batch', requireDb, async (req, res) => {
 const clientDistPath = path.join(__dirname, '../client/dist');
 app.use(express.static(clientDistPath));
 
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return next();
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    const indexPath = path.join(clientDistPath, 'index.html');
+    return res.sendFile(indexPath, (err) => {
+      if (err) next();
+    });
   }
-  const indexPath = path.join(clientDistPath, 'index.html');
-  res.sendFile(indexPath, (err) => {
-    if (err) next();
-  });
+  next();
 });
 
 // Start Express server

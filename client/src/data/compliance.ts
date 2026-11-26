@@ -1,3 +1,5 @@
+import { apiBatchSave } from '../services/api';
+
 export type ComplianceEntity = 'company' | 'individual';
 
 export type ComplianceCategory =
@@ -657,6 +659,7 @@ export const saveStoredCompliances = (items: ComplianceItem[]): void => {
   try {
     localStorage.setItem(STORAGE_KEY_COMPLIANCES, JSON.stringify(items));
     window.dispatchEvent(new Event('compliance_updated'));
+    apiBatchSave('compliances', items).catch(console.warn);
   } catch (e) {
     console.error('Failed to save compliances to storage:', e);
   }

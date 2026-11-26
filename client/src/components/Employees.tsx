@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { apiBatchSave } from '../services/api';
 import {
   Plus,
   Edit,
@@ -138,10 +139,11 @@ const Employees = () => {
     pt: 200,
   });
 
-  // Save to localStorage whenever employees change
+  // Save to localStorage whenever employees change & sync to Atlas
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_EMPLOYEES, JSON.stringify(employees));
+      apiBatchSave('employees', employees).catch(console.warn);
     } catch (e) {
       console.error('Failed to save employees:', e);
     }

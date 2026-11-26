@@ -2,6 +2,7 @@ import { getStoredClients } from '../components/ClientList';
 import { formatDateDMY } from '../utils/date';
 import { isKarnatakaLocation, calculateTaxes } from '../utils/gst';
 import { getStoredBillingProfiles } from './profile';
+import { apiBatchSave } from '../services/api';
 
 export interface InvoiceLineItem {
   id: string;
@@ -289,6 +290,7 @@ export const saveStoredInvoices = (invoices: Invoice[]) => {
   try {
     localStorage.setItem(STORAGE_KEY_INVOICES, JSON.stringify(invoices));
     window.dispatchEvent(new Event('invoices_updated'));
+    apiBatchSave('invoices', invoices).catch(console.warn);
   } catch (err) {
     console.error('Error saving invoices to localStorage', err);
   }
@@ -313,6 +315,7 @@ export const saveStoredRecurringTemplates = (templates: RecurringInvoiceTemplate
   try {
     localStorage.setItem(STORAGE_KEY_RECURRING, JSON.stringify(templates));
     window.dispatchEvent(new Event('recurring_invoices_updated'));
+    apiBatchSave('recurring_templates', templates).catch(console.warn);
   } catch (err) {
     console.error('Error saving recurring invoices to localStorage', err);
   }
@@ -481,6 +484,7 @@ export const saveStoredCreditNotes = (creditNotes: CreditNote[]) => {
   try {
     localStorage.setItem(STORAGE_KEY_CREDIT_NOTES, JSON.stringify(creditNotes));
     window.dispatchEvent(new Event('credit_notes_updated'));
+    apiBatchSave('credit_notes', creditNotes).catch(console.warn);
   } catch (err) {
     console.error('Error saving credit notes to localStorage', err);
   }

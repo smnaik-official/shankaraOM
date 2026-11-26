@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiBatchSave, apiGetCollection } from '../services/api';
 import {
   Plus,
   Edit,
@@ -92,6 +93,10 @@ export const saveStoredClients = (clients: Client[]) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
     window.dispatchEvent(new Event('clients_updated'));
+    // Persist immediately to MongoDB Atlas Cloud
+    apiBatchSave('clients', clients).catch((err) => {
+      console.warn('[MongoDB Atlas] Auto-sync clients failed:', err);
+    });
   } catch (err) {
     console.error('Error saving clients to localStorage', err);
   }
@@ -116,13 +121,30 @@ const ClientList: React.FC = () => {
   });
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Listen for storage updates across tabs/components
+  // Listen for storage updates across tabs/components & sync with Atlas
   useEffect(() => {
     const handleSync = () => {
       setClients(getStoredClients());
     };
     window.addEventListener('clients_updated', handleSync);
     window.addEventListener('storage', handleSync);
+
+    // Reconcile with MongoDB Atlas on mount
+    apiGetCollection<Client>('clients', getStoredClients()).then((remoteClients) => {
+      if (remoteClients && remoteClients.length > 0) {
+        const local = getStoredClients();
+        const mergedMap = new Map<string, Client>();
+        remoteClients.forEach((c) => mergedMap.set(c.id || c.name, c));
+        local.forEach((c) => mergedMap.set(c.id || c.name, c));
+        const merged = Array.from(mergedMap.values());
+        setClients(merged);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        if (merged.length !== remoteClients.length) {
+          apiBatchSave('clients', merged);
+        }
+      }
+    });
+
     return () => {
       window.removeEventListener('clients_updated', handleSync);
       window.removeEventListener('storage', handleSync);

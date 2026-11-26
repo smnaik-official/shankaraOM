@@ -1,3 +1,5 @@
+import { apiBatchSave } from '../services/api';
+
 export type SubscriptionDuration =
   | 'Monthly'
   | 'Quarterly'
@@ -428,6 +430,7 @@ export const getStoredSubscriptions = (): Subscription[] => {
 export const saveStoredSubscriptions = (subs: Subscription[]): void => {
   try {
     localStorage.setItem(STORAGE_KEY_SUBSCRIPTIONS, JSON.stringify(subs));
+    apiBatchSave('subscriptions', subs).catch(console.warn);
   } catch (e) {
     console.error('Failed to save subscriptions:', e);
   }
