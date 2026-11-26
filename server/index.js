@@ -254,6 +254,20 @@ app.post('/api/:collection/batch', requireDb, async (req, res) => {
   }
 });
 
+// Serve static client build if present (for single-server production deployment)
+const clientDistPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientDistPath));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  const indexPath = path.join(clientDistPath, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) next();
+  });
+});
+
 // Start Express server
 app.listen(PORT, async () => {
   console.log(`[Express] Backend API running at http://localhost:${PORT}`);
