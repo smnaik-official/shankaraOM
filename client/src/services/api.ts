@@ -10,7 +10,8 @@ export interface DatabaseStatus {
   error?: string;
 }
 
-const API_BASE = '/api';
+const rawApiUrl = (import.meta as any).env?.VITE_API_URL;
+const API_BASE = rawApiUrl ? `${rawApiUrl.replace(/\/$/, '')}/api` : '/api';
 
 // Check connection to MongoDB Atlas
 export async function checkDatabaseHealth(): Promise<DatabaseStatus> {
