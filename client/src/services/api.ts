@@ -28,6 +28,7 @@ export async function checkDatabaseHealth(): Promise<DatabaseStatus> {
         database: data.database?.database ?? 'shankara_admin_db',
         pingMs,
         lastChecked: new Date().toLocaleTimeString(),
+        error: data.database?.error ?? undefined,
       };
     } else {
       return {

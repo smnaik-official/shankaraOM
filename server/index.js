@@ -23,9 +23,16 @@ app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 let dbClient = null;
 let db = null;
+let connectPromise = null;
+let hasSeeded = false;
+
+const clusterHost = MONGODB_URI.includes('@')
+  ? MONGODB_URI.split('@')[1].split('/')[0]
+  : 'shankaraom.2nepkoh.mongodb.net';
+
 let connectionStatus = {
   connected: false,
-  cluster: 'shankaraom.2nepkoh.mongodb.net',
+  cluster: clusterHost,
   database: DB_NAME,
   connectedAt: null,
   error: null,
@@ -50,6 +57,7 @@ async function seedCollections(database) {
         }
       }
     }
+    hasSeeded = true;
   } catch (seedErr) {
     console.error('[Seed Error] Failed to seed initial data:', seedErr.message);
   }
@@ -57,10 +65,21 @@ async function seedCollections(database) {
 
 // Connect to MongoDB Atlas
 async function initMongo() {
+  let client = null;
   try {
-    console.log(`[MongoDB] Connecting to Atlas (${MONGODB_URI.split('@')[1].split('/')[0]})...`);
-    dbClient = new MongoClient(MONGODB_URI);
-    await dbClient.connect();
+    console.log(`[MongoDB] Connecting to Atlas (${clusterHost})...`);
+    client = new MongoClient(MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+    });
+    await client.connect();
+
+    client.on('close', () => {
+      dbClient = null;
+      db = null;
+      connectionStatus.connected = false;
+    });
+
+    dbClient = client;
     db = dbClient.db(DB_NAME);
 
     connectionStatus.connected = true;
@@ -68,13 +87,39 @@ async function initMongo() {
     connectionStatus.error = null;
     console.log(`[MongoDB] Successfully connected to database: ${DB_NAME}`);
 
-    await seedCollections(db);
+    if (!hasSeeded) {
+      await seedCollections(db);
+    }
   } catch (err) {
+    if (client) {
+      await client.close().catch(() => {});
+    }
+    dbClient = null;
+    db = null;
     connectionStatus.connected = false;
     connectionStatus.error = err.message;
     console.error('[MongoDB] Connection error:', err.message);
   }
 }
+
+// Lazily establish and reuse a single MongoDB connection across requests (serverless-safe)
+async function ensureMongoConnected() {
+  if (db && connectionStatus.connected) {
+    return;
+  }
+  if (!connectPromise) {
+    connectPromise = initMongo().finally(() => {
+      connectPromise = null;
+    });
+  }
+  await connectPromise;
+}
+
+// Ensure API requests wait for initial MongoDB connection attempt (crucial on Vercel serverless)
+app.use('/api', async (req, res, next) => {
+  await ensureMongoConnected();
+  next();
+});
 
 // Ensure database connection middleware
 const requireDb = (req, res, next) => {
@@ -268,8 +313,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Start Express server
-app.listen(PORT, async () => {
-  console.log(`[Express] Backend API running at http://localhost:${PORT}`);
-  await initMongo();
-});
+// Start Express server for local / non-serverless environments
+if (!process.env.VERCEL) {
+  app.listen(PORT, async () => {
+    console.log(`[Express] Backend API running at http://localhost:${PORT}`);
+    await ensureMongoConnected();
+  });
+}
+
+export default app;
