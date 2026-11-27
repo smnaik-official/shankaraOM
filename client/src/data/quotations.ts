@@ -1,4 +1,5 @@
-import { Proposal, initialProposals } from './proposals';
+import { Proposal, saveStoredProposals } from './proposals';
+import { apiBatchSave } from '../services/api';
 
 export interface ProposalPillar {
   id: string;
@@ -521,12 +522,12 @@ export const syncQuotationToProposal = (quotation: Quotation) => {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        proposals = Array.isArray(parsed) ? parsed : [...initialProposals];
+        proposals = Array.isArray(parsed) ? parsed : [];
       } catch {
-        proposals = [...initialProposals];
+        proposals = [];
       }
     } else {
-      proposals = [...initialProposals];
+      proposals = [];
     }
 
     const existingIndex = proposals.findIndex(
@@ -595,7 +596,7 @@ export const syncQuotationToProposal = (quotation: Quotation) => {
       proposals.unshift(newProposal);
     }
 
-    localStorage.setItem('shankara_proposals_data', JSON.stringify(proposals));
+    saveStoredProposals(proposals);
   } catch (e) {
     console.error('Failed to sync quotation to proposal:', e);
   }
@@ -604,9 +605,9 @@ export const syncQuotationToProposal = (quotation: Quotation) => {
 export const getStoredQuotations = (): Quotation[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_QUOTATIONS);
-    if (!raw) return [sampleStelaarcQuotation, sampleEcommerceQuotation];
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed)) {
       return parsed.map((q: any) => ({
         ...q,
         currency: q.currency || 'INR',
@@ -614,15 +615,17 @@ export const getStoredQuotations = (): Quotation[] => {
         status: normalizeQuotationStatus(q.status),
       }));
     }
-    return [sampleStelaarcQuotation, sampleEcommerceQuotation];
+    return [];
   } catch (e) {
-    return [sampleStelaarcQuotation, sampleEcommerceQuotation];
+    return [];
   }
 };
 
 export const saveStoredQuotations = (quotations: Quotation[]) => {
   try {
     localStorage.setItem(STORAGE_KEY_QUOTATIONS, JSON.stringify(quotations));
+    window.dispatchEvent(new Event('quotations_updated'));
+    apiBatchSave('quotations', quotations).catch(console.warn);
   } catch (e) {
     console.error('Failed to save quotations:', e);
   }

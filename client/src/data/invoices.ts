@@ -268,22 +268,14 @@ export const getStoredInvoices = (): Invoice[] => {
     const raw = localStorage.getItem(STORAGE_KEY_INVOICES);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Ensure standard seed invoices are merged by ID if missing
-        const existingIds = new Set(parsed.map((p: Invoice) => p.id));
-        const missingInitial = initialInvoices.filter((init) => !existingIds.has(init.id));
-        if (missingInitial.length > 0) {
-          const merged = [...parsed, ...missingInitial];
-          localStorage.setItem(STORAGE_KEY_INVOICES, JSON.stringify(merged));
-          return merged;
-        }
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (err) {
     console.error('Error reading invoices from localStorage', err);
   }
-  return initialInvoices;
+  return [];
 };
 
 export const saveStoredInvoices = (invoices: Invoice[]) => {
@@ -301,14 +293,14 @@ export const getStoredRecurringTemplates = (): RecurringInvoiceTemplate[] => {
     const raw = localStorage.getItem(STORAGE_KEY_RECURRING);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (err) {
     console.error('Error reading recurring invoices from localStorage', err);
   }
-  return initialRecurringTemplates;
+  return [];
 };
 
 export const saveStoredRecurringTemplates = (templates: RecurringInvoiceTemplate[]) => {
@@ -470,14 +462,14 @@ export const getStoredCreditNotes = (): CreditNote[] => {
     const raw = localStorage.getItem(STORAGE_KEY_CREDIT_NOTES);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (err) {
     console.error('Error reading credit notes from localStorage', err);
   }
-  return initialCreditNotes;
+  return [];
 };
 
 export const saveStoredCreditNotes = (creditNotes: CreditNote[]) => {

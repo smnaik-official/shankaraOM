@@ -170,7 +170,7 @@ const InvoiceList: React.FC = () => {
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const clients = useMemo(() => getStoredClients(), []);
+  const [clients, setClients] = useState(() => getStoredClients());
 
   // Listen for storage events
   useEffect(() => {
@@ -178,15 +178,18 @@ const InvoiceList: React.FC = () => {
       setInvoices(getStoredInvoices());
       setRecurringTemplates(getStoredRecurringTemplates());
       setCreditNotes(getStoredCreditNotes());
+      setClients(getStoredClients());
     };
     window.addEventListener('invoices_updated', handleSync);
     window.addEventListener('recurring_invoices_updated', handleSync);
     window.addEventListener('credit_notes_updated', handleSync);
+    window.addEventListener('clients_updated', handleSync);
     window.addEventListener('storage', handleSync);
     return () => {
       window.removeEventListener('invoices_updated', handleSync);
       window.removeEventListener('recurring_invoices_updated', handleSync);
       window.removeEventListener('credit_notes_updated', handleSync);
+      window.removeEventListener('clients_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
   }, []);

@@ -188,11 +188,11 @@ const EXPENSE_TEMPLATES_STORAGE_KEY = 'shankara_recurring_expense_templates';
 export const getStoredExpenses = (): Expense[] => {
   try {
     const raw = localStorage.getItem(EXPENSES_STORAGE_KEY);
-    if (!raw) return mockExpenses;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : mockExpenses;
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    return mockExpenses;
+    return [];
   }
 };
 
@@ -208,17 +208,18 @@ export const saveStoredExpenses = (expenses: Expense[]) => {
 export const getStoredExpenseTemplates = (): RecurringTemplate[] => {
   try {
     const raw = localStorage.getItem(EXPENSE_TEMPLATES_STORAGE_KEY);
-    if (!raw) return defaultRecurringTemplates;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : defaultRecurringTemplates;
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    return defaultRecurringTemplates;
+    return [];
   }
 };
 
 export const saveStoredExpenseTemplates = (templates: RecurringTemplate[]) => {
   try {
     localStorage.setItem(EXPENSE_TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+    apiBatchSave('recurring_expense_templates', templates).catch(console.warn);
   } catch (e) {
     console.error('Failed to save recurring expense templates:', e);
   }

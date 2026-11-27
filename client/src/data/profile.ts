@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiSaveItem } from '../services/api';
 
 export interface BillingEntityProfile {
   legalName: string;
@@ -144,6 +145,7 @@ export const saveStoredBillingProfiles = (profiles: BillingProfilesConfig): void
     localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
     // Dispatch custom event for real-time syncing across components
     window.dispatchEvent(new Event('billing_profiles_updated'));
+    apiSaveItem('billing_profiles', { id: 'default', ...profiles }).catch(console.warn);
   } catch (err) {
     console.error('Failed to save billing profiles to localStorage', err);
   }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiBatchSave, apiGetCollection } from '../services/api';
+import { apiBatchSave } from '../services/api';
 import {
   Plus,
   Edit,
@@ -61,7 +61,7 @@ export const getStoredClients = (): Client[] => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         // Upgrade Tamagna client details if old mock gstin
         const tamagna = parsed.find((c: any) => c.name?.toLowerCase().includes('tamagna'));
         if (tamagna && (tamagna.gstin === '29ABCDE1234F1Z5' || tamagna.address?.includes('Plot 42'))) {
@@ -86,7 +86,7 @@ export const getStoredClients = (): Client[] => {
   } catch (err) {
     console.error('Error reading clients from localStorage', err);
   }
-  return initialClients;
+  return [];
 };
 
 export const saveStoredClients = (clients: Client[]) => {
@@ -121,29 +121,13 @@ const ClientList: React.FC = () => {
   });
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Listen for storage updates across tabs/components & sync with Atlas
+  // Listen for storage updates across tabs/components & cloud sync
   useEffect(() => {
     const handleSync = () => {
       setClients(getStoredClients());
     };
     window.addEventListener('clients_updated', handleSync);
     window.addEventListener('storage', handleSync);
-
-    // Reconcile with MongoDB Atlas on mount
-    apiGetCollection<Client>('clients', getStoredClients()).then((remoteClients) => {
-      if (remoteClients && remoteClients.length > 0) {
-        const local = getStoredClients();
-        const mergedMap = new Map<string, Client>();
-        remoteClients.forEach((c) => mergedMap.set(c.id || c.name, c));
-        local.forEach((c) => mergedMap.set(c.id || c.name, c));
-        const merged = Array.from(mergedMap.values());
-        setClients(merged);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-        if (merged.length !== remoteClients.length) {
-          apiBatchSave('clients', merged);
-        }
-      }
-    });
 
     return () => {
       window.removeEventListener('clients_updated', handleSync);

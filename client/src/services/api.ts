@@ -123,19 +123,21 @@ export async function syncAllFromMongo(): Promise<Record<string, any> | null> {
   return null;
 }
 
-// Storage Key Mappings for 2-way Cloud Sync
+// Storage Key Mappings matching each module's localStorage key
 export const COLLECTION_KEYS: Record<string, string> = {
   invoices: 'invoice_admin_invoices',
-  recurring_templates: 'invoice_admin_recurring_templates',
+  recurring_templates: 'invoice_admin_recurring_invoices',
   credit_notes: 'invoice_admin_credit_notes',
   clients: 'invoice_admin_clients',
-  expenses: 'business_expenses_data',
-  subscriptions: 'admin_panel_subscriptions',
-  compliances: 'invoice_admin_compliances',
-  billing_profiles: 'invoice_admin_profiles',
-  employees: 'invoice_admin_employees',
-  ad_ledger: 'invoice_admin_ad_ledger',
-  proposals: 'invoice_admin_proposals',
+  expenses: 'shankara_expenses_data',
+  recurring_expense_templates: 'shankara_recurring_expense_templates',
+  subscriptions: 'shankara_subscriptions_data',
+  compliances: 'shankara_compliance_calendar_records',
+  billing_profiles: 'invoice_admin_billing_profiles',
+  employees: 'shankara_employees_data',
+  ad_ledger: 'shankara_ad_ledger_data',
+  proposals: 'shankara_proposals_data',
+  quotations: 'shankara_quotations_data',
 };
 
 export const COLLECTION_EVENTS: Record<string, string> = {
@@ -144,15 +146,17 @@ export const COLLECTION_EVENTS: Record<string, string> = {
   credit_notes: 'credit_notes_updated',
   clients: 'clients_updated',
   expenses: 'expenses_updated',
+  recurring_expense_templates: 'expense_templates_updated',
   subscriptions: 'subscriptions_updated',
-  compliances: 'compliances_updated',
-  billing_profiles: 'profile_updated',
+  compliances: 'compliance_updated',
+  billing_profiles: 'billing_profiles_updated',
   employees: 'employees_updated',
   ad_ledger: 'ad_ledger_updated',
-  proposals: 'proposals_updated',
+  proposals: 'proposals-changed',
+  quotations: 'quotations_updated',
 };
 
-// Two-way synchronization on app load
+// Pull authoritative state from MongoDB Atlas on app load / manual re-sync
 export async function initializeCloudSync(): Promise<void> {
   try {
     const status = await checkDatabaseHealth();
@@ -166,43 +170,29 @@ export async function initializeCloudSync(): Promise<void> {
 
     for (const [collection, key] of Object.entries(COLLECTION_KEYS)) {
       const remoteItems = remoteData[collection];
-      const localRaw = localStorage.getItem(key);
-      let localItems: any[] = [];
-      try {
-        if (localRaw) localItems = JSON.parse(localRaw);
-      } catch (e) {}
+      if (remoteItems === undefined) continue;
+
+      if (collection === 'billing_profiles') {
+        const profileObj = Array.isArray(remoteItems) ? remoteItems[0] : remoteItems;
+        if (profileObj && typeof profileObj === 'object' && profileObj.company) {
+          localStorage.setItem(key, JSON.stringify(profileObj));
+          const evt = COLLECTION_EVENTS[collection];
+          if (evt) window.dispatchEvent(new Event(evt));
+        }
+        continue;
+      }
 
       if (Array.isArray(remoteItems)) {
-        // Merge local & remote by ID or name
-        const mergedMap = new Map<string, any>();
-        remoteItems.forEach((item) => {
-          const id = item.id || item.name || JSON.stringify(item);
-          mergedMap.set(id, item);
-        });
-
-        // Retain local items created offline (like 'Test Client')
-        if (Array.isArray(localItems)) {
-          localItems.forEach((item) => {
-            const id = item.id || item.name || JSON.stringify(item);
-            mergedMap.set(id, item);
-          });
-        }
-
-        const merged = Array.from(mergedMap.values());
-        localStorage.setItem(key, JSON.stringify(merged));
-
-        // Push any local offline additions back to MongoDB Atlas
-        if (merged.length > remoteItems.length) {
-          apiBatchSave(collection, merged);
-        }
-
+        // MongoDB Atlas is the source of truth; preserve empty arrays so deleted items stay deleted
+        localStorage.setItem(key, JSON.stringify(remoteItems));
         const evt = COLLECTION_EVENTS[collection];
         if (evt) {
           window.dispatchEvent(new Event(evt));
         }
       }
     }
-    console.log('[Cloud Sync] Two-way synchronization with MongoDB Atlas completed.');
+    window.dispatchEvent(new CustomEvent('notifications-changed'));
+    console.log('[Cloud Sync] Synchronized with MongoDB Atlas.');
   } catch (err) {
     console.error('[Cloud Sync] Initialization error:', err);
   }

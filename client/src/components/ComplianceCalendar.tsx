@@ -35,7 +35,11 @@ export const ComplianceCalendar: React.FC = () => {
       setCompliances(getStoredCompliances());
     };
     window.addEventListener('compliance_updated', handleUpdate);
-    return () => window.removeEventListener('compliance_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('compliance_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, []);
 
   // Filter States
@@ -459,20 +463,18 @@ export const ComplianceCalendar: React.FC = () => {
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Delete (custom compliances) */}
-                          {item.isCustom && (
-                            <button
-                              onClick={() => {
-                                if (confirm(`Delete "${item.title}"?`)) {
-                                  deleteCompliance(item.id);
-                                }
-                              }}
-                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-                              title="Delete compliance"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          {/* Delete compliance */}
+                          <button
+                            onClick={() => {
+                              if (confirm(`Delete "${item.title}"?`)) {
+                                deleteCompliance(item.id);
+                              }
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                            title="Delete compliance"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

@@ -419,11 +419,11 @@ export const defaultSubscriptions: Subscription[] = [
 export const getStoredSubscriptions = (): Subscription[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_SUBSCRIPTIONS);
-    if (!raw) return defaultSubscriptions;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : defaultSubscriptions;
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    return defaultSubscriptions;
+    return [];
   }
 };
 

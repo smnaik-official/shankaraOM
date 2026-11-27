@@ -1,3 +1,5 @@
+import { apiBatchSave } from '../services/api';
+
 export type ProposalStatus =
   | 'Sent to Client'
   | 'Under Review'
@@ -207,9 +209,9 @@ export const normalizeProposalStatus = (status: string): ProposalStatus => {
 export const getStoredProposals = (): Proposal[] => {
   try {
     const raw = localStorage.getItem(PROPOSALS_STORAGE_KEY);
-    if (!raw) return initialProposals;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed)) {
       return parsed.map((p: any) => ({
         ...p,
         quotationNumber: p.quotationNumber
@@ -218,9 +220,9 @@ export const getStoredProposals = (): Proposal[] => {
         status: normalizeProposalStatus(p.status),
       }));
     }
-    return initialProposals;
+    return [];
   } catch (e) {
-    return initialProposals;
+    return [];
   }
 };
 
@@ -229,6 +231,7 @@ export const saveStoredProposals = (proposals: Proposal[]) => {
     localStorage.setItem(PROPOSALS_STORAGE_KEY, JSON.stringify(proposals));
     window.dispatchEvent(new CustomEvent('proposals-changed'));
     window.dispatchEvent(new CustomEvent('notifications-changed'));
+    apiBatchSave('proposals', proposals).catch(console.warn);
   } catch (e) {
     console.error('Failed to save proposals:', e);
   }

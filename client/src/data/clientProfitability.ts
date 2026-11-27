@@ -442,11 +442,11 @@ export const defaultClientDirectExpenses: ClientDirectExpense[] = [
 export const getStoredEmployeeAllocations = (): EmployeeCostAllocation[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ALLOCATIONS);
-    if (!raw) return defaultEmployeeAllocations;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : defaultEmployeeAllocations;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return defaultEmployeeAllocations;
+    return [];
   }
 };
 
@@ -462,11 +462,11 @@ export const saveStoredEmployeeAllocations = (allocations: EmployeeCostAllocatio
 export const getStoredClientDirectExpenses = (): ClientDirectExpense[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_DIRECT_EXPENSES);
-    if (!raw) return defaultClientDirectExpenses;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : defaultClientDirectExpenses;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return defaultClientDirectExpenses;
+    return [];
   }
 };
 

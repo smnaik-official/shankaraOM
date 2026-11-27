@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Plus,
   Download,
@@ -53,8 +53,26 @@ export const Quotations: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'client' | 'objectives' | 'scope' | 'commercials' | 'terms'>('client');
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
 
-  // Save to localStorage when state changes
+  const shouldPersistRef = useRef(false);
+
+  // Listen for cloud sync & cross-tab updates
   useEffect(() => {
+    const handleSync = () => {
+      shouldPersistRef.current = false;
+      setQuotations(getStoredQuotations());
+    };
+    window.addEventListener('quotations_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('quotations_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
+  // Save to localStorage & MongoDB only when user mutates state
+  useEffect(() => {
+    if (!shouldPersistRef.current) return;
+    shouldPersistRef.current = false;
     saveStoredQuotations(quotations);
   }, [quotations]);
 
@@ -191,12 +209,14 @@ export const Quotations: React.FC = () => {
       date: new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
     };
+    shouldPersistRef.current = true;
     setQuotations([clone, ...quotations]);
   };
 
   // Delete proposal
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to delete this commercial quotation?')) {
+      shouldPersistRef.current = true;
       setQuotations(quotations.filter((q) => q.id !== id));
     }
   };
@@ -218,6 +238,7 @@ export const Quotations: React.FC = () => {
     };
 
     const exists = quotations.some((q) => q.id === updated.id);
+    shouldPersistRef.current = true;
     if (exists) {
       setQuotations(quotations.map((q) => (q.id === updated.id ? updated : q)));
     } else {
@@ -243,6 +264,7 @@ export const Quotations: React.FC = () => {
       status: newStatus,
       updatedAt: new Date().toISOString().split('T')[0],
     };
+    shouldPersistRef.current = true;
     setQuotations(quotations.map((item) => (item.id === q.id ? updated : item)));
     if (newStatus === 'Sent to Client') {
       syncQuotationToProposal(updated);

@@ -38,28 +38,18 @@ let connectionStatus = {
   error: null,
 };
 
-// Seed database if empty
+// Seed only essential configuration (billing_profiles) if missing; never re-seed dummy business data
 async function seedCollections(database) {
   try {
-    for (const [collectionName, data] of Object.entries(initialSeedData)) {
-      const col = database.collection(collectionName);
-      const count = await col.countDocuments();
-
-      if (count === 0) {
-        if (Array.isArray(data)) {
-          if (data.length > 0) {
-            await col.insertMany(data);
-            console.log(`[Seed] Seeded ${data.length} records into '${collectionName}'`);
-          }
-        } else if (typeof data === 'object') {
-          await col.insertOne(data);
-          console.log(`[Seed] Seeded initial config into '${collectionName}'`);
-        }
-      }
+    const profileCol = database.collection('billing_profiles');
+    const profileCount = await profileCol.countDocuments();
+    if (profileCount === 0 && initialSeedData.billing_profiles) {
+      await profileCol.insertOne(initialSeedData.billing_profiles);
+      console.log(`[Seed] Seeded initial config into 'billing_profiles'`);
     }
     hasSeeded = true;
   } catch (seedErr) {
-    console.error('[Seed Error] Failed to seed initial data:', seedErr.message);
+    console.error('[Seed Error] Failed to seed initial config:', seedErr.message);
   }
 }
 
@@ -172,12 +162,14 @@ app.get('/api/sync/all', requireDb, async (req, res) => {
       'credit_notes',
       'clients',
       'expenses',
+      'recurring_expense_templates',
       'subscriptions',
       'compliances',
       'billing_profiles',
       'employees',
       'ad_ledger',
       'proposals',
+      'quotations',
     ];
 
     for (const name of collectionNames) {

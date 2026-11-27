@@ -41,44 +41,24 @@ export interface AdLedgerEntry {
 
 const STORAGE_KEY_AD_LEDGER = 'shankara_ad_ledger_data';
 
-const initialAdSpends: AdLedgerEntry[] = [
-  {
-    id: '1',
-    transactionId: 'TXN-9823471',
-    client: 'M/s Tamagna Personalcare Pvt Ltd',
-    platform: 'Google Ads',
-    type: 'Spend',
-    amount: 5000,
-    date: '2026-10-02',
-  },
-  {
-    id: '2',
-    transactionId: 'TXN-1029384',
-    client: 'The Art of Living Foundation',
-    platform: 'Meta Ads',
-    type: 'Spend',
-    amount: 8000,
-    date: '2026-10-06',
-  },
-  {
-    id: '3',
-    transactionId: 'DEP-10001',
-    client: 'The Art of Living Foundation',
-    platform: 'Bank Transfer',
-    type: 'Deposit',
-    amount: 15000,
-    date: '2026-10-01',
-  },
-];
-
 const getStoredAdLedger = (): AdLedgerEntry[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_AD_LEDGER);
-    if (!raw) return initialAdSpends;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : initialAdSpends;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return initialAdSpends;
+    return [];
+  }
+};
+
+const saveStoredAdLedger = (entries: AdLedgerEntry[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY_AD_LEDGER, JSON.stringify(entries));
+    window.dispatchEvent(new Event('ad_ledger_updated'));
+    apiBatchSave('ad_ledger', entries).catch(console.warn);
+  } catch (e) {
+    console.error('Failed to save ad ledger:', e);
   }
 };
 
@@ -119,15 +99,18 @@ const AdLedger = () => {
     };
   }, [exportDropdownOpen]);
 
-  // Persist to local storage & sync to Atlas
+  // Listen for cloud sync & cross-tab updates
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_AD_LEDGER, JSON.stringify(adSpends));
-      apiBatchSave('ad_ledger', adSpends).catch(console.warn);
-    } catch (e) {
-      console.error('Failed to save ad ledger:', e);
-    }
-  }, [adSpends]);
+    const handleSync = () => {
+      setAdSpends(getStoredAdLedger());
+    };
+    window.addEventListener('ad_ledger_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('ad_ledger_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   // Clients list for autocomplete
   const registeredClients = useMemo(() => {
@@ -281,7 +264,9 @@ const AdLedger = () => {
 
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to delete this ad ledger entry?')) {
-      setAdSpends(adSpends.filter((e) => e.id !== id));
+      const updated = adSpends.filter((e) => e.id !== id);
+      setAdSpends(updated);
+      saveStoredAdLedger(updated);
     }
   };
 
@@ -302,11 +287,12 @@ const AdLedger = () => {
       date: formState.date || new Date().toISOString().split('T')[0],
     };
 
-    if (editingEntry) {
-      setAdSpends(adSpends.map((item) => (item.id === editingEntry.id ? payload : item)));
-    } else {
-      setAdSpends([payload, ...adSpends]);
-    }
+    const updated = editingEntry
+      ? adSpends.map((item) => (item.id === editingEntry.id ? payload : item))
+      : [payload, ...adSpends];
+
+    setAdSpends(updated);
+    saveStoredAdLedger(updated);
 
     setIsModalOpen(false);
     setEditingEntry(null);

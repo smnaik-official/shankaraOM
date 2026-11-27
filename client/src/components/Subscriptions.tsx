@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   CalendarClock,
   Plus,
@@ -91,8 +91,26 @@ export const Subscriptions: React.FC = () => {
   // Clients list for dropdowns
   const clientList = useMemo(() => getStoredClients(), []);
 
-  // Save subscriptions to localStorage
+  const shouldPersistRef = useRef(false);
+
+  // Listen for cloud sync & cross-tab updates
   useEffect(() => {
+    const handleSync = () => {
+      shouldPersistRef.current = false;
+      setSubscriptions(getStoredSubscriptions());
+    };
+    window.addEventListener('subscriptions_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('subscriptions_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
+  // Save subscriptions to localStorage & MongoDB only on user mutations
+  useEffect(() => {
+    if (!shouldPersistRef.current) return;
+    shouldPersistRef.current = false;
     saveStoredSubscriptions(subscriptions);
     window.dispatchEvent(new CustomEvent('notifications-changed'));
   }, [subscriptions]);
@@ -138,6 +156,7 @@ export const Subscriptions: React.FC = () => {
       if (!confirmed) return;
 
       const fallback = categories.find((c) => c !== catToRemove) || 'Other';
+      shouldPersistRef.current = true;
       setSubscriptions((prev) =>
         prev.map((s) => (s.category === catToRemove ? { ...s, category: fallback } : s))
       );
@@ -285,6 +304,7 @@ export const Subscriptions: React.FC = () => {
 
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to delete this subscription?')) {
+      shouldPersistRef.current = true;
       setSubscriptions(subscriptions.filter((s) => s.id !== id));
     }
   };
@@ -315,6 +335,7 @@ export const Subscriptions: React.FC = () => {
       lastRenewedDate: editingSub ? editingSub.lastRenewedDate : undefined,
     };
 
+    shouldPersistRef.current = true;
     if (editingSub) {
       setSubscriptions(subscriptions.map((s) => (s.id === editingSub.id ? payload : s)));
     } else {
@@ -355,6 +376,7 @@ export const Subscriptions: React.FC = () => {
     }
 
     // Update the subscription in state
+    shouldPersistRef.current = true;
     setSubscriptions(
       subscriptions.map((s) => {
         if (s.id === renewingSub.id) {

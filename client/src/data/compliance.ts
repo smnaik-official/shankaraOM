@@ -631,11 +631,9 @@ export const getStoredCompliances = (): ComplianceItem[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_COMPLIANCES);
     let items: ComplianceItem[] = [];
-    if (!raw) {
-      items = DEFAULT_COMPLIANCES;
-    } else {
+    if (raw) {
       const parsed = JSON.parse(raw);
-      items = Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_COMPLIANCES;
+      items = Array.isArray(parsed) ? parsed : [];
     }
 
     // Always recompute dynamic status against current date
@@ -651,7 +649,7 @@ export const getStoredCompliances = (): ComplianceItem[] => {
     });
   } catch (e) {
     console.error('Failed to parse compliances from storage:', e);
-    return DEFAULT_COMPLIANCES;
+    return [];
   }
 };
 

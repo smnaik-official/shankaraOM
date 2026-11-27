@@ -113,11 +113,21 @@ export const initialEmployees: Employee[] = [
 export const getStoredEmployees = (): Employee[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_EMPLOYEES);
-    if (!raw) return initialEmployees;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : initialEmployees;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return initialEmployees;
+    return [];
+  }
+};
+
+export const saveStoredEmployees = (employees: Employee[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY_EMPLOYEES, JSON.stringify(employees));
+    window.dispatchEvent(new Event('employees_updated'));
+    apiBatchSave('employees', employees).catch(console.warn);
+  } catch (e) {
+    console.error('Failed to save employees:', e);
   }
 };
 
@@ -139,15 +149,18 @@ const Employees = () => {
     pt: 200,
   });
 
-  // Save to localStorage whenever employees change & sync to Atlas
+  // Listen for cloud sync & cross-tab updates
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_EMPLOYEES, JSON.stringify(employees));
-      apiBatchSave('employees', employees).catch(console.warn);
-    } catch (e) {
-      console.error('Failed to save employees:', e);
-    }
-  }, [employees]);
+    const handleSync = () => {
+      setEmployees(getStoredEmployees());
+    };
+    window.addEventListener('employees_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('employees_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   // Distinct roles for filter
   const distinctRoles = useMemo(() => {
@@ -209,11 +222,12 @@ const Employees = () => {
       dateOfJoining: newEmp.dateOfJoining || new Date().toISOString().split('T')[0],
     };
 
-    if (editingId) {
-      setEmployees(employees.map((e) => (e.id === editingId ? payload : e)));
-    } else {
-      setEmployees([payload, ...employees]);
-    }
+    const updated = editingId
+      ? employees.map((e) => (e.id === editingId ? payload : e))
+      : [payload, ...employees];
+
+    setEmployees(updated);
+    saveStoredEmployees(updated);
 
     handleCancel();
   };
@@ -241,7 +255,9 @@ const Employees = () => {
 
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to remove this employee record?')) {
-      setEmployees(employees.filter((e) => e.id !== id));
+      const updated = employees.filter((e) => e.id !== id);
+      setEmployees(updated);
+      saveStoredEmployees(updated);
     }
   };
 

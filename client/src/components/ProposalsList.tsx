@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Plus,
   Edit,
@@ -29,20 +29,7 @@ import {
   getNextProposalId,
 } from '../data/proposals';
 import { getCurrencySymbol, getCurrencyLocale } from '../data/quotations';
-import { getStoredQuotations, syncQuotationToProposal } from '../data/quotations';
 import { formatDateDMY } from '../utils/date';
-
-const loadAndSyncProposals = (): Proposal[] => {
-  try {
-    const quotations = getStoredQuotations();
-    quotations
-      .filter((q) => q.status === 'Sent to Client')
-      .forEach((q) => syncQuotationToProposal(q));
-  } catch (e) {
-    console.error('Failed to sync quotations:', e);
-  }
-  return getStoredProposals();
-};
 
 const STATUS_CONFIG: Record<
   ProposalStatus,
@@ -79,7 +66,8 @@ const STATUS_CONFIG: Record<
 };
 
 const ProposalsList: React.FC = () => {
-  const [proposals, setProposals] = useState<Proposal[]>(() => loadAndSyncProposals());
+  const [proposals, setProposals] = useState<Proposal[]>(() => getStoredProposals());
+  const shouldPersistRef = useRef(false);
 
   // Views & Filters
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
@@ -102,18 +90,21 @@ const ProposalsList: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!shouldPersistRef.current) return;
+    shouldPersistRef.current = false;
     saveStoredProposals(proposals);
   }, [proposals]);
 
   useEffect(() => {
     const handleSync = () => {
-      setProposals(loadAndSyncProposals());
+      shouldPersistRef.current = false;
+      setProposals(getStoredProposals());
     };
+    window.addEventListener('proposals-changed', handleSync);
     window.addEventListener('storage', handleSync);
-    window.addEventListener('focus', handleSync);
     return () => {
+      window.removeEventListener('proposals-changed', handleSync);
       window.removeEventListener('storage', handleSync);
-      window.removeEventListener('focus', handleSync);
     };
   }, []);
 
@@ -218,6 +209,7 @@ const ProposalsList: React.FC = () => {
             } as Proposal)
           : p
       );
+      shouldPersistRef.current = true;
       setProposals(updatedList);
       showToast(`Proposal "${formState.clientName}" updated successfully.`);
     } else {
@@ -243,6 +235,7 @@ const ProposalsList: React.FC = () => {
         createdAt: nowStr,
         updatedAt: nowStr,
       };
+      shouldPersistRef.current = true;
       setProposals([newEntry, ...proposals]);
       showToast(`New quote for "${newEntry.clientName}" logged into pipeline.`);
     }
@@ -270,6 +263,7 @@ const ProposalsList: React.FC = () => {
       }
       return p;
     });
+    shouldPersistRef.current = true;
     setProposals(updated);
     showToast(`Status updated to "${newStatus}".`);
   };
@@ -277,6 +271,7 @@ const ProposalsList: React.FC = () => {
   // Delete Proposal
   const handleDeleteProposal = (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete proposal for "${name}"?`)) {
+      shouldPersistRef.current = true;
       setProposals(proposals.filter((p) => p.id !== id));
       showToast(`Proposal for "${name}" removed.`);
     }

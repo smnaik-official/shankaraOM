@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AreaChart,
@@ -72,11 +72,32 @@ const CustomChartTooltip = ({ active, payload, label }: any) => {
 };
 
 const Dashboard: React.FC = () => {
-  const invoices = useMemo(() => getStoredInvoices(), []);
-  const recurringTemplates = useMemo(() => getStoredRecurringTemplates(), []);
-  const clients = useMemo(() => getStoredClients(), []);
-  const creditNotes = useMemo(() => getStoredCreditNotes(), []);
-  const expenses = useMemo(() => getStoredExpenses(), []);
+  const [invoices, setInvoices] = useState(() => getStoredInvoices());
+  const [recurringTemplates, setRecurringTemplates] = useState(() => getStoredRecurringTemplates());
+  const [clients, setClients] = useState(() => getStoredClients());
+  const [creditNotes, setCreditNotes] = useState(() => getStoredCreditNotes());
+  const [expenses, setExpenses] = useState(() => getStoredExpenses());
+
+  useEffect(() => {
+    const refresh = () => {
+      setInvoices(getStoredInvoices());
+      setRecurringTemplates(getStoredRecurringTemplates());
+      setClients(getStoredClients());
+      setCreditNotes(getStoredCreditNotes());
+      setExpenses(getStoredExpenses());
+    };
+    const events = [
+      'invoices_updated',
+      'recurring_invoices_updated',
+      'clients_updated',
+      'credit_notes_updated',
+      'expenses_updated',
+      'proposals-changed',
+      'storage',
+    ];
+    events.forEach((ev) => window.addEventListener(ev, refresh));
+    return () => events.forEach((ev) => window.removeEventListener(ev, refresh));
+  }, []);
 
   // Total Expenses for Current Month (Nov 2026)
   const currentMonthExpenses = useMemo(() => {

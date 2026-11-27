@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   Plus,
@@ -97,16 +97,45 @@ const Expenses: React.FC = () => {
     }
   }, [searchParams]);
 
+  const shouldPersistExpensesRef = useRef(false);
+  const shouldPersistTemplatesRef = useRef(false);
+
+  // Listen for cloud sync & cross-tab updates
   useEffect(() => {
+    const handleExpenseSync = () => {
+      shouldPersistExpensesRef.current = false;
+      setExpenses(getStoredExpenses());
+    };
+    const handleTemplateSync = () => {
+      shouldPersistTemplatesRef.current = false;
+      setRecurringTemplates(getStoredExpenseTemplates());
+    };
+    window.addEventListener('expenses_updated', handleExpenseSync);
+    window.addEventListener('expense_templates_updated', handleTemplateSync);
+    window.addEventListener('storage', handleExpenseSync);
+    window.addEventListener('storage', handleTemplateSync);
+    return () => {
+      window.removeEventListener('expenses_updated', handleExpenseSync);
+      window.removeEventListener('expense_templates_updated', handleTemplateSync);
+      window.removeEventListener('storage', handleExpenseSync);
+      window.removeEventListener('storage', handleTemplateSync);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!shouldPersistExpensesRef.current) return;
+    shouldPersistExpensesRef.current = false;
     saveStoredExpenses(expenses);
     window.dispatchEvent(new CustomEvent('notifications-changed'));
     window.dispatchEvent(new Event('expenses_updated'));
   }, [expenses]);
 
   useEffect(() => {
+    if (!shouldPersistTemplatesRef.current) return;
+    shouldPersistTemplatesRef.current = false;
     saveStoredExpenseTemplates(recurringTemplates);
     window.dispatchEvent(new CustomEvent('notifications-changed'));
-    window.dispatchEvent(new Event('expenses_updated'));
+    window.dispatchEvent(new Event('expense_templates_updated'));
   }, [recurringTemplates]);
 
   // Modal states for One-Time Expense
@@ -582,6 +611,7 @@ const Expenses: React.FC = () => {
       };
     });
 
+    shouldPersistExpensesRef.current = true;
     setExpenses((prev) => [...newExpenseEntries, ...prev]);
     setActionMessage(`Successfully posted ${newExpenseEntries.length} recurring expenses (${formatCurrency(
       newExpenseEntries.reduce((s, c) => s + c.amount, 0)
@@ -608,6 +638,7 @@ const Expenses: React.FC = () => {
       isRecurring: true,
       recurringTemplateId: template.id,
     };
+    shouldPersistExpensesRef.current = true;
     setExpenses((prev) => [newEntry, ...prev]);
     setActionMessage(`Posted "${template.title}" for ${targetPostingMonth}!`);
     setTimeout(() => setActionMessage(null), 4000);
@@ -615,6 +646,7 @@ const Expenses: React.FC = () => {
 
   // Toggle template active / paused
   const handleToggleTemplateActive = (id: string) => {
+    shouldPersistTemplatesRef.current = true;
     setRecurringTemplates((prev) =>
       prev.map((t) => (t.id === id ? { ...t, isActive: !t.isActive } : t))
     );
@@ -623,6 +655,7 @@ const Expenses: React.FC = () => {
   // Delete recurring template
   const handleDeleteTemplate = (id: string) => {
     if (window.confirm('Are you sure you want to delete this recurring expense?')) {
+      shouldPersistTemplatesRef.current = true;
       setRecurringTemplates((prev) => prev.filter((t) => t.id !== id));
     }
   };
@@ -673,6 +706,7 @@ const Expenses: React.FC = () => {
     }
 
     if (editingTemplateId) {
+      shouldPersistTemplatesRef.current = true;
       setRecurringTemplates((prev) =>
         prev.map((t) =>
           t.id === editingTemplateId
@@ -697,6 +731,7 @@ const Expenses: React.FC = () => {
         isActive: newTemplate.isActive !== false,
         notes: newTemplate.notes || '',
       };
+      shouldPersistTemplatesRef.current = true;
       setRecurringTemplates((prev) => [...prev, created]);
     }
 
@@ -732,10 +767,12 @@ const Expenses: React.FC = () => {
         isActive: true,
         notes: 'Created from manual expense entry',
       };
+      shouldPersistTemplatesRef.current = true;
       setRecurringTemplates((prev) => [...prev, createdTemplate]);
     }
 
     if (editingExpenseId) {
+      shouldPersistExpensesRef.current = true;
       setExpenses((prev) =>
         prev.map((e) =>
           e.id === editingExpenseId
@@ -750,6 +787,7 @@ const Expenses: React.FC = () => {
         )
       );
     } else {
+      shouldPersistExpensesRef.current = true;
       setExpenses((prev) => [
         {
           id: Math.random().toString(36).substr(2, 9),
@@ -775,7 +813,10 @@ const Expenses: React.FC = () => {
   };
 
   const handleDeleteExpense = (id: string) => {
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    if (window.confirm('Are you sure you want to delete this expense?')) {
+      shouldPersistExpensesRef.current = true;
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+    }
   };
 
   return (
