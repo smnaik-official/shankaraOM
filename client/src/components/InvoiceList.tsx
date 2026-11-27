@@ -371,6 +371,23 @@ const InvoiceList: React.FC = () => {
     e.preventDefault();
     if (!editingInvoice) return;
 
+    const trimmedId = (editInvoiceForm.id || '').trim();
+    if (!trimmedId) {
+      setEditInvoiceError('Please enter a valid invoice number.');
+      return;
+    }
+
+    if (
+      invoices.some(
+        (inv) =>
+          inv.id !== editingInvoice.id &&
+          inv.id.trim().toLowerCase() === trimmedId.toLowerCase()
+      )
+    ) {
+      setEditInvoiceError(`Invoice number "${trimmedId}" already exists.`);
+      return;
+    }
+
     if (!editInvoiceForm.client?.trim()) {
       setEditInvoiceError('Please select or enter a client name.');
       return;
@@ -393,6 +410,7 @@ const InvoiceList: React.FC = () => {
       inv.id === editingInvoice.id
         ? ({
             ...inv,
+            id: trimmedId,
             client: editInvoiceForm.client!.trim(),
             date: editInvoiceForm.date || inv.date,
             type: editInvoiceForm.type || 'COMPANY',
@@ -412,7 +430,7 @@ const InvoiceList: React.FC = () => {
 
     setInvoices(updatedInvoices);
     saveStoredInvoices(updatedInvoices);
-    showToast(`Invoice ${editingInvoice.id} updated successfully!`);
+    showToast(`Invoice ${trimmedId} updated successfully!`);
     setIsEditInvoiceModalOpen(false);
     setEditingInvoice(null);
   };
@@ -1644,11 +1662,24 @@ const InvoiceList: React.FC = () => {
                 </div>
               )}
 
-              {/* Top Section: Client Details, Date & Status */}
+              {/* Top Section: Invoice Number, Client Details, Date & Status */}
               <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-200/80 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                  {/* Client Name (Col 6) */}
-                  <div className="sm:col-span-6">
+                  {/* Invoice Number (Col 3) */}
+                  <div className="sm:col-span-3">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Invoice Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editInvoiceForm.id || ''}
+                      onChange={(e) => setEditInvoiceForm({ ...editInvoiceForm, id: e.target.value })}
+                      className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Client Name (Col 4) */}
+                  <div className="sm:col-span-4">
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                       Client / Company <span className="text-red-500">*</span>
                     </label>
@@ -1690,8 +1721,8 @@ const InvoiceList: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Status (Col 3) */}
-                  <div className="sm:col-span-3">
+                  {/* Status (Col 2) */}
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                       Invoice Status
                     </label>

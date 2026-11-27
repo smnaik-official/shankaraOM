@@ -18,13 +18,18 @@ import {
 const InvoiceForm: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [clients] = useState<Client[]>(() => getStoredClients());
-  const [recurringTemplates] = useState<RecurringInvoiceTemplate[]>(() => getStoredRecurringTemplates());
+  const [clients, setClients] = useState<Client[]>(() => getStoredClients());
+  const [recurringTemplates, setRecurringTemplates] = useState<RecurringInvoiceTemplate[]>(() => getStoredRecurringTemplates());
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [type, setType] = useState<'COMPANY' | 'PERSONAL'>('COMPANY');
   const [selectedClient, setSelectedClient] = useState<string>('');
-  const [invoiceDate, setInvoiceDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const initialDate = new Date().toISOString().slice(0, 10);
+  const [invoiceDate, setInvoiceDate] = useState<string>(initialDate);
+  const [invoiceNumber, setInvoiceNumber] = useState<string>(() =>
+    getNextInvoiceNumber(getStoredInvoices(), initialDate)
+  );
+  const [isInvoiceNumberEdited, setIsInvoiceNumberEdited] = useState<boolean>(false);
   const [notes, setNotes] = useState<string>('');
   const [saveAsRecurring, setSaveAsRecurring] = useState<boolean>(false);
   const [recurringTitle, setRecurringTitle] = useState<string>('');
@@ -33,6 +38,27 @@ const InvoiceForm: React.FC = () => {
   const [items, setItems] = useState<InvoiceLineItem[]>([
     { id: '1', desc: '', sac: '998311', units: 1, rate: 0 },
   ]);
+
+  // Refresh clients, templates, and suggested invoice number on cloud sync
+  useEffect(() => {
+    const handleSync = () => {
+      setClients(getStoredClients());
+      setRecurringTemplates(getStoredRecurringTemplates());
+      if (!isInvoiceNumberEdited) {
+        setInvoiceNumber(getNextInvoiceNumber(getStoredInvoices(), invoiceDate));
+      }
+    };
+    window.addEventListener('clients_updated', handleSync);
+    window.addEventListener('recurring_invoices_updated', handleSync);
+    window.addEventListener('invoices_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('clients_updated', handleSync);
+      window.removeEventListener('recurring_invoices_updated', handleSync);
+      window.removeEventListener('invoices_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [invoiceDate, isInvoiceNumberEdited]);
 
   // Pre-fill from converted Proposal or query parameters
   useEffect(() => {
@@ -128,6 +154,11 @@ const InvoiceForm: React.FC = () => {
 
   // Save Invoice & Navigate to /invoices
   const handleSaveInvoice = (status: 'Paid' | 'Pending' | 'Draft' = 'Pending') => {
+    const trimmedInvoiceNumber = invoiceNumber.trim();
+    if (!trimmedInvoiceNumber) {
+      alert('Please enter a valid Invoice Number.');
+      return;
+    }
     if (!selectedClient) {
       alert('Please select or specify a Client.');
       return;
@@ -138,10 +169,13 @@ const InvoiceForm: React.FC = () => {
     }
 
     const currentInvoices = getStoredInvoices();
-    const newInvoiceNumber = getNextInvoiceNumber(currentInvoices, invoiceDate);
+    if (currentInvoices.some((inv) => inv.id.trim().toLowerCase() === trimmedInvoiceNumber.toLowerCase())) {
+      alert(`Invoice number "${trimmedInvoiceNumber}" already exists. Please use a unique invoice number.`);
+      return;
+    }
 
     const newInvoice: Invoice = {
-      id: newInvoiceNumber,
+      id: trimmedInvoiceNumber,
       client: selectedClient,
       date: invoiceDate,
       type,
@@ -285,8 +319,8 @@ const InvoiceForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Client & Date Selection */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Client, Invoice Number & Date Selection */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">
               Client / Customer <span className="text-red-500">*</span>
@@ -310,13 +344,52 @@ const InvoiceForm: React.FC = () => {
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-gray-700">
+                Invoice Number <span className="text-red-500">*</span>
+              </label>
+              {isInvoiceNumberEdited && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsInvoiceNumberEdited(false);
+                    setInvoiceNumber(getNextInvoiceNumber(getStoredInvoices(), invoiceDate));
+                  }}
+                  className="text-[11px] font-semibold text-indigo-600 hover:underline"
+                >
+                  Auto
+                </button>
+              )}
+            </div>
+            <input
+              type="text"
+              value={invoiceNumber}
+              onChange={(e) => {
+                setIsInvoiceNumberEdited(true);
+                setInvoiceNumber(e.target.value);
+              }}
+              placeholder="e.g. 0001/2026-27"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p className="text-[11px] text-gray-400 mt-1">
+              Editable starting serial; next invoice auto-increments.
+            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs font-semibold text-gray-700">Invoice Date</label>
               <span className="text-xs text-indigo-600 font-semibold">{formatDateDMY(invoiceDate)}</span>
             </div>
             <input
               type="date"
               value={invoiceDate}
-              onChange={(e) => setInvoiceDate(e.target.value)}
+              onChange={(e) => {
+                const nextDate = e.target.value;
+                setInvoiceDate(nextDate);
+                if (!isInvoiceNumberEdited && nextDate) {
+                  setInvoiceNumber(getNextInvoiceNumber(getStoredInvoices(), nextDate));
+                }
+              }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>

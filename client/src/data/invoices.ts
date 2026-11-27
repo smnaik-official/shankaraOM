@@ -327,7 +327,7 @@ export const getNextInvoiceNumber = (existingInvoices: Invoice[], dateStr: strin
   const fySuffix = `${fyStart}-${fyEnd < 10 ? '0' : ''}${fyEnd}`;
 
   // Find max number for this FY
-  let maxSeq = 20; // baseline
+  let maxSeq = 0; // starts at 0001 when no invoices exist for the FY
   existingInvoices.forEach((inv) => {
     if (inv.id && inv.id.includes(`/${fySuffix}`)) {
       const match = inv.id.match(/^(\d+)\//);
