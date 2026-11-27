@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -38,8 +38,12 @@ import {
 import { pdf } from '@react-pdf/renderer';
 import { FinancialReportPDF } from './FinancialReportPDF';
 import { getStoredBillingProfiles } from '../data/profile';
+import { getStoredInvoices } from '../data/invoices';
+import { getStoredExpenses } from '../data/expenses';
+import { getStoredAdLedger } from './AdLedger';
 
 interface MonthlyRecord {
+  ym: string;
   month: string;
   fullMonth: string;
   year: number;
@@ -61,55 +65,19 @@ interface TimeRangeConfig {
   badge?: string;
 }
 
+const currentYearNum = new Date().getFullYear();
+const lastYearNum = currentYearNum - 1;
+
 const timeRangeOptions: TimeRangeConfig[] = [
   { id: '3M', label: 'Last 3 Months', shortLabel: '3 Months' },
   { id: '6M', label: 'Last 6 Months', shortLabel: '6 Months' },
   { id: '9M', label: 'Last 9 Months', shortLabel: '9 Months' },
   { id: '12M', label: 'Last 12 Months', shortLabel: '12 Months' },
-  { id: 'THIS_YEAR', label: 'This Year', shortLabel: 'This Year (2026)', badge: '2026' },
-  { id: 'LAST_YEAR', label: 'Last Year', shortLabel: 'Last Year (2025)', badge: '2025' },
+  { id: 'THIS_YEAR', label: 'This Year', shortLabel: `This Year (${currentYearNum})`, badge: String(currentYearNum) },
+  { id: 'LAST_YEAR', label: 'Last Year', shortLabel: `Last Year (${lastYearNum})`, badge: String(lastYearNum) },
 ];
 
-const rawMonthlyData: MonthlyRecord[] = [
-  // 2025 (Last Year)
-  { month: 'Jan 25', fullMonth: 'January 2025', year: 2025, income: 34000, expenses: 22000, payroll: 13500, adSpend: 4200, software: 2200, office: 2100, quarter: 'Q1 2025' },
-  { month: 'Feb 25', fullMonth: 'February 2025', year: 2025, income: 36000, expenses: 23000, payroll: 14000, adSpend: 4600, software: 2300, office: 2100, quarter: 'Q1 2025' },
-  { month: 'Mar 25', fullMonth: 'March 2025', year: 2025, income: 38500, expenses: 24000, payroll: 14500, adSpend: 4900, software: 2500, office: 2100, quarter: 'Q1 2025' },
-  { month: 'Apr 25', fullMonth: 'April 2025', year: 2025, income: 39000, expenses: 24500, payroll: 15000, adSpend: 5000, software: 2400, office: 2100, quarter: 'Q2 2025' },
-  { month: 'May 25', fullMonth: 'May 2025', year: 2025, income: 41000, expenses: 25000, payroll: 15500, adSpend: 5200, software: 2300, office: 2000, quarter: 'Q2 2025' },
-  { month: 'Jun 25', fullMonth: 'June 2025', year: 2025, income: 43500, expenses: 26000, payroll: 16000, adSpend: 5500, software: 2500, office: 2000, quarter: 'Q2 2025' },
-  { month: 'Jul 25', fullMonth: 'July 2025', year: 2025, income: 42000, expenses: 25500, payroll: 15500, adSpend: 5400, software: 2500, office: 2100, quarter: 'Q3 2025' },
-  { month: 'Aug 25', fullMonth: 'August 2025', year: 2025, income: 44000, expenses: 26500, payroll: 16000, adSpend: 5700, software: 2700, office: 2100, quarter: 'Q3 2025' },
-  { month: 'Sep 25', fullMonth: 'September 2025', year: 2025, income: 46000, expenses: 27000, payroll: 16500, adSpend: 5800, software: 2600, office: 2100, quarter: 'Q3 2025' },
-  { month: 'Oct 25', fullMonth: 'October 2025', year: 2025, income: 45500, expenses: 26800, payroll: 16500, adSpend: 5600, software: 2600, office: 2100, quarter: 'Q4 2025' },
-  { month: 'Nov 25', fullMonth: 'November 2025', year: 2025, income: 42000, expenses: 26000, payroll: 16000, adSpend: 5500, software: 2500, office: 2000, quarter: 'Q4 2025' },
-  { month: 'Dec 25', fullMonth: 'December 2025', year: 2025, income: 46500, expenses: 27500, payroll: 16500, adSpend: 6000, software: 2800, office: 2200, quarter: 'Q4 2025' },
-
-  // 2026 (This Year)
-  { month: 'Jan 26', fullMonth: 'January 2026', year: 2026, income: 45000, expenses: 28000, payroll: 17000, adSpend: 6200, software: 2600, office: 2200, quarter: 'Q1 2026' },
-  { month: 'Feb 26', fullMonth: 'February 2026', year: 2026, income: 52000, expenses: 30000, payroll: 18000, adSpend: 6800, software: 2900, office: 2300, quarter: 'Q1 2026' },
-  { month: 'Mar 26', fullMonth: 'March 2026', year: 2026, income: 48000, expenses: 29500, payroll: 18000, adSpend: 6200, software: 3000, office: 2300, quarter: 'Q1 2026' },
-  { month: 'Apr 26', fullMonth: 'April 2026', year: 2026, income: 61000, expenses: 32000, payroll: 19000, adSpend: 7500, software: 3100, office: 2400, quarter: 'Q2 2026' },
-  { month: 'May 26', fullMonth: 'May 2026', year: 2026, income: 59000, expenses: 31000, payroll: 19000, adSpend: 6800, software: 2800, office: 2400, quarter: 'Q2 2026' },
-  { month: 'Jun 26', fullMonth: 'June 2026', year: 2026, income: 75000, expenses: 38000, payroll: 22000, adSpend: 9500, software: 3800, office: 2700, quarter: 'Q2 2026' },
-  { month: 'Jul 26', fullMonth: 'July 2026', year: 2026, income: 68000, expenses: 35500, payroll: 21000, adSpend: 8600, software: 3300, office: 2600, quarter: 'Q3 2026' },
-  { month: 'Aug 26', fullMonth: 'August 2026', year: 2026, income: 72000, expenses: 36000, payroll: 21500, adSpend: 8700, software: 3200, office: 2600, quarter: 'Q3 2026' },
-  { month: 'Sep 26', fullMonth: 'September 2026', year: 2026, income: 81000, expenses: 39500, payroll: 23000, adSpend: 10200, software: 3600, office: 2700, quarter: 'Q3 2026' },
-  { month: 'Oct 26', fullMonth: 'October 2026', year: 2026, income: 89000, expenses: 41000, payroll: 24000, adSpend: 10800, software: 3400, office: 2800, quarter: 'Q4 2026' },
-  { month: 'Nov 26', fullMonth: 'November 2026', year: 2026, income: 94000, expenses: 43000, payroll: 25000, adSpend: 11500, software: 3600, office: 2900, quarter: 'Q4 2026' },
-];
-
-const clientRevenueShare = [
-  { name: 'M/s Tamagna Personalcare', value: 248000, percentage: 36.5, color: '#4f46e5' },
-  { name: 'The Art of Living Foundation', value: 182000, percentage: 26.8, color: '#06b6d4' },
-  { name: 'Tech Solutions Inc', value: 145000, percentage: 21.3, color: '#8b5cf6' },
-  { name: 'Direct Retail & Others', value: 105000, percentage: 15.4, color: '#f59e0b' },
-];
-
-const invoiceProfileShare = [
-  { name: 'Company Billing', value: 495000, percentage: 72.8, color: '#4f46e5' },
-  { name: 'Personal Billing', value: 185000, percentage: 27.2, color: '#ec4899' },
-];
+const CLIENT_SHARE_COLORS = ['#4f46e5', '#06b6d4', '#8b5cf6', '#f59e0b', '#64748b'];
 
 const costCategoryColors: Record<string, string> = {
   Payroll: '#4f46e5',
@@ -227,6 +195,21 @@ const Reports: React.FC = () => {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const exportDropdownRef = React.useRef<HTMLDivElement>(null);
 
+  const [invoices, setInvoices] = useState(() => getStoredInvoices());
+  const [expenses, setExpenses] = useState(() => getStoredExpenses());
+  const [adLedger, setAdLedger] = useState(() => getStoredAdLedger());
+
+  useEffect(() => {
+    const refresh = () => {
+      setInvoices(getStoredInvoices());
+      setExpenses(getStoredExpenses());
+      setAdLedger(getStoredAdLedger());
+    };
+    const events = ['invoices_updated', 'expenses_updated', 'ad_ledger_updated', 'storage'];
+    events.forEach((ev) => window.addEventListener(ev, refresh));
+    return () => events.forEach((ev) => window.removeEventListener(ev, refresh));
+  }, []);
+
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
@@ -241,19 +224,78 @@ const Reports: React.FC = () => {
     };
   }, [exportDropdownOpen]);
 
+  // Build monthly series from live invoices, expenses & ad ledger (lastYear Jan .. current month)
+  const rawMonthlyData = useMemo<MonthlyRecord[]>(() => {
+    const now = new Date();
+    const startYear = now.getFullYear() - 1;
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth();
+
+    const buckets: MonthlyRecord[] = [];
+    for (let y = startYear; y <= endYear; y++) {
+      const maxM = y === endYear ? endMonth : 11;
+      for (let m = 0; m <= maxM; m++) {
+        const d = new Date(y, m, 1);
+        const ym = `${y}-${String(m + 1).padStart(2, '0')}`;
+        const shortM = d.toLocaleDateString('en-US', { month: 'short' });
+        const longM = d.toLocaleDateString('en-US', { month: 'long' });
+        const quarterNum = Math.floor(m / 3) + 1;
+
+        const income = invoices
+          .filter((inv) => inv.status !== 'Cancelled' && (inv.date || '').startsWith(ym))
+          .reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
+
+        const monthExps = expenses.filter((exp) => (exp.date || '').startsWith(ym));
+        const payroll = monthExps
+          .filter((e) => e.category === 'Payroll')
+          .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        const software = monthExps
+          .filter((e) => e.category === 'IT')
+          .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        const marketingExp = monthExps
+          .filter((e) => e.category === 'Marketing')
+          .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        const adSpendLedger = adLedger
+          .filter((ad) => ad.type === 'Spend' && (ad.date || '').startsWith(ym))
+          .reduce((sum, ad) => sum + (Number(ad.amount) || 0), 0);
+        const adSpend = marketingExp + adSpendLedger;
+        const office = monthExps
+          .filter((e) => e.category !== 'Payroll' && e.category !== 'IT' && e.category !== 'Marketing')
+          .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+        buckets.push({
+          ym,
+          month: `${shortM} ${String(y).slice(-2)}`,
+          fullMonth: `${longM} ${y}`,
+          year: y,
+          income,
+          expenses: payroll + adSpend + software + office,
+          payroll,
+          adSpend,
+          software,
+          office,
+          quarter: `Q${quarterNum} ${y}`,
+        });
+      }
+    }
+    return buckets;
+  }, [invoices, expenses, adLedger]);
+
   // Process raw data with MoM metrics across full history
   const enrichedData = useMemo(() => {
     return rawMonthlyData.map((curr, idx, arr) => {
       const prev = idx > 0 ? arr[idx - 1] : null;
       const netProfit = curr.income - curr.expenses;
-      const profitMargin = Number(((netProfit / curr.income) * 100).toFixed(1));
-      const momIncomeGrowth = prev
-        ? Number((((curr.income - prev.income) / prev.income) * 100).toFixed(1))
-        : null;
-      const momExpenseGrowth = prev
-        ? Number((((curr.expenses - prev.expenses) / prev.expenses) * 100).toFixed(1))
-        : null;
-      const efficiencyRatio = Number(((curr.expenses / curr.income) * 100).toFixed(1));
+      const profitMargin = curr.income > 0 ? Number(((netProfit / curr.income) * 100).toFixed(1)) : 0;
+      const momIncomeGrowth =
+        prev && prev.income > 0
+          ? Number((((curr.income - prev.income) / prev.income) * 100).toFixed(1))
+          : null;
+      const momExpenseGrowth =
+        prev && prev.expenses > 0
+          ? Number((((curr.expenses - prev.expenses) / prev.expenses) * 100).toFixed(1))
+          : null;
+      const efficiencyRatio = curr.income > 0 ? Number(((curr.expenses / curr.income) * 100).toFixed(1)) : 0;
 
       return {
         ...curr,
@@ -264,7 +306,7 @@ const Reports: React.FC = () => {
         efficiencyRatio,
       };
     });
-  }, []);
+  }, [rawMonthlyData]);
 
   // Filter dataset dynamically based on user's selected time range
   const displayData = useMemo(() => {
@@ -278,13 +320,66 @@ const Reports: React.FC = () => {
       case '12M':
         return enrichedData.slice(-12);
       case 'THIS_YEAR':
-        return enrichedData.filter((d) => d.year === 2026);
+        return enrichedData.filter((d) => d.year === currentYearNum);
       case 'LAST_YEAR':
-        return enrichedData.filter((d) => d.year === 2025);
+        return enrichedData.filter((d) => d.year === lastYearNum);
       default:
         return enrichedData.slice(-12);
     }
   }, [enrichedData, timeRange]);
+
+  // Dynamic client & profile revenue breakdown for selected period
+  const { clientRevenueShare, invoiceProfileShare } = useMemo(() => {
+    const activeMonths = new Set(displayData.map((d) => d.ym));
+    const periodInvoices = invoices.filter(
+      (inv) => inv.status !== 'Cancelled' && activeMonths.has((inv.date || '').slice(0, 7))
+    );
+    const totalRev = periodInvoices.reduce((s, inv) => s + (Number(inv.amount) || 0), 0);
+
+    const byClient = new Map<string, number>();
+    periodInvoices.forEach((inv) => {
+      const name = inv.client || 'Unknown Client';
+      byClient.set(name, (byClient.get(name) || 0) + (Number(inv.amount) || 0));
+    });
+
+    const sortedClients = Array.from(byClient.entries()).sort((a, b) => b[1] - a[1]);
+    const topClients = sortedClients.slice(0, 4);
+    const othersTotal = sortedClients.slice(4).reduce((s, [, val]) => s + val, 0);
+    if (othersTotal > 0) {
+      topClients.push(['Other Accounts', othersTotal]);
+    }
+
+    const clientShare = topClients.map(([name, value], idx) => ({
+      name,
+      value,
+      percentage: totalRev > 0 ? Number(((value / totalRev) * 100).toFixed(1)) : 0,
+      color: CLIENT_SHARE_COLORS[idx % CLIENT_SHARE_COLORS.length],
+    }));
+
+    const companyTotal = periodInvoices
+      .filter((inv) => inv.type === 'COMPANY')
+      .reduce((s, inv) => s + (Number(inv.amount) || 0), 0);
+    const personalTotal = periodInvoices
+      .filter((inv) => inv.type === 'PERSONAL')
+      .reduce((s, inv) => s + (Number(inv.amount) || 0), 0);
+
+    const profileShare = [
+      {
+        name: 'Company Billing',
+        value: companyTotal,
+        percentage: totalRev > 0 ? Number(((companyTotal / totalRev) * 100).toFixed(1)) : 0,
+        color: '#4f46e5',
+      },
+      {
+        name: 'Personal Billing',
+        value: personalTotal,
+        percentage: totalRev > 0 ? Number(((personalTotal / totalRev) * 100).toFixed(1)) : 0,
+        color: '#ec4899',
+      },
+    ];
+
+    return { clientRevenueShare: clientShare, invoiceProfileShare: profileShare };
+  }, [displayData, invoices]);
 
   // Dynamic range label description
   const rangeDescription = useMemo(() => {
@@ -307,8 +402,14 @@ const Reports: React.FC = () => {
     // Latest month MoM performance
     const latest = displayData[displayData.length - 1];
     const prev = displayData.length > 1 ? displayData[displayData.length - 2] : null;
-    const latestIncomeGrowth = prev ? Number((((latest.income - prev.income) / prev.income) * 100).toFixed(1)) : 0;
-    const latestExpenseGrowth = prev ? Number((((latest.expenses - prev.expenses) / prev.expenses) * 100).toFixed(1)) : 0;
+    const latestIncomeGrowth =
+      latest && prev && prev.income > 0
+        ? Number((((latest.income - prev.income) / prev.income) * 100).toFixed(1))
+        : 0;
+    const latestExpenseGrowth =
+      latest && prev && prev.expenses > 0
+        ? Number((((latest.expenses - prev.expenses) / prev.expenses) * 100).toFixed(1))
+        : 0;
 
     // Breakdown for expenses
     const totalPayroll = displayData.reduce((acc, curr) => acc + curr.payroll, 0);
@@ -925,8 +1026,20 @@ const Reports: React.FC = () => {
                     <td className="py-3.5 px-4 text-indigo-700 font-bold">{formatCurrency(aggregates.totalNetProfit)}</td>
                     <td className="py-3.5 px-4 text-indigo-700 font-bold">{aggregates.overallMargin}% Avg</td>
                     <td className="py-3.5 px-4 text-center">
-                      <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[10px]">
-                        Overall Profitable
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] ${
+                          aggregates.totalIncome === 0 && aggregates.totalExpenses === 0
+                            ? 'bg-gray-100 text-gray-600'
+                            : aggregates.totalNetProfit >= 0
+                              ? 'bg-indigo-100 text-indigo-800'
+                              : 'bg-rose-100 text-rose-700'
+                        }`}
+                      >
+                        {aggregates.totalIncome === 0 && aggregates.totalExpenses === 0
+                          ? 'No Activity'
+                          : aggregates.totalNetProfit >= 0
+                            ? 'Overall Profitable'
+                            : 'Net Deficit'}
                       </span>
                     </td>
                   </tr>
@@ -1102,7 +1215,14 @@ const Reports: React.FC = () => {
                     Payroll, Office leases, utilities, and core software subscriptions.
                   </p>
                   <div className="mt-3 text-xs font-medium text-indigo-900 bg-white/80 px-2.5 py-1 rounded inline-block">
-                    ~68% of total expenditure
+                    {aggregates.totalExpenses > 0
+                      ? `${Math.round(
+                          (((aggregates.costBreakdown.find((c) => c.name === 'Payroll')?.value || 0) +
+                            (aggregates.costBreakdown.find((c) => c.name === 'Office & Operations')?.value || 0)) /
+                            aggregates.totalExpenses) *
+                            100
+                        )}% of total expenditure`
+                      : '0% of total expenditure'}
                   </div>
                 </div>
 
@@ -1115,7 +1235,13 @@ const Reports: React.FC = () => {
                     Direct Client Ad Spends (Google/Meta) and project-linked expenses.
                   </p>
                   <div className="mt-3 text-xs font-medium text-pink-900 bg-white/80 px-2.5 py-1 rounded inline-block">
-                    ~32% scaling with client demand
+                    {aggregates.totalExpenses > 0
+                      ? `${Math.round(
+                          ((aggregates.costBreakdown.find((c) => c.name === 'Ad Spends')?.value || 0) /
+                            aggregates.totalExpenses) *
+                            100
+                        )}% scaling with client demand`
+                      : '0% of total expenditure'}
                   </div>
                 </div>
               </div>
@@ -1125,7 +1251,13 @@ const Reports: React.FC = () => {
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-semibold text-gray-700">Cost-to-Income Health Gauge</span>
                   <span className="font-bold" style={{ color: '#6a5fa8' }}>
-                    {aggregates.overallEfficiency}% (Safe Zone)
+                    {aggregates.overallEfficiency}% (
+                    {aggregates.totalIncome === 0 && aggregates.totalExpenses === 0
+                      ? 'No Activity'
+                      : aggregates.overallEfficiency < 65
+                        ? 'Safe Zone'
+                        : 'High Burn'}
+                    )
                   </span>
                 </div>
                 <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden flex">
@@ -1154,7 +1286,16 @@ const Reports: React.FC = () => {
             </div>
 
             <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-              <span>Runway: <strong>Unlimited</strong> (Positive Cash Flow Model)</span>
+              <span>
+                Status:{' '}
+                <strong>
+                  {aggregates.totalIncome === 0 && aggregates.totalExpenses === 0
+                    ? 'No Activity'
+                    : aggregates.totalNetProfit >= 0
+                      ? 'Positive Cash Flow'
+                      : 'Net Burn'}
+                </strong>
+              </span>
               <span>Average Monthly Burn: <strong>{formatCurrency(aggregates.avgMonthlyExpense)}</strong></span>
             </div>
           </div>
@@ -1172,32 +1313,40 @@ const Reports: React.FC = () => {
                 <p className="text-xs text-gray-500">Share of total billing across top accounts</p>
               </div>
               <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">
-                Diversified
+                {clientRevenueShare.length > 1 ? 'Diversified' : clientRevenueShare.length === 1 ? 'Single Account' : 'No Invoices'}
               </span>
             </div>
 
-            <div className="space-y-3 mt-4">
-              {clientRevenueShare.map((client) => (
-                <div key={client.name} className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-gray-800">{client.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-600">{formatCurrency(client.value)}</span>
-                      <span className="font-bold text-indigo-600 text-[11px] w-12 text-right">{client.percentage}%</span>
+            {clientRevenueShare.length === 0 ? (
+              <div className="py-10 text-center text-xs text-gray-400">
+                No invoice revenue recorded for this period.
+              </div>
+            ) : (
+              <div className="space-y-3 mt-4">
+                {clientRevenueShare.map((client) => (
+                  <div key={client.name} className="space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-semibold text-gray-800">{client.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-600">{formatCurrency(client.value)}</span>
+                        <span className="font-bold text-indigo-600 text-[11px] w-12 text-right">{client.percentage}%</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${client.percentage}%`, backgroundColor: client.color }}
+                      ></div>
                     </div>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${client.percentage}%`, backgroundColor: client.color }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             <p className="mt-5 text-xs text-gray-400 border-t border-gray-100 pt-3">
-              Top client represents 36.5% of total inflow, demonstrating sound risk distribution without single-client dependency.
+              {clientRevenueShare.length > 0
+                ? `Top client (${clientRevenueShare[0].name}) represents ${clientRevenueShare[0].percentage}% of total inflow for the selected period.`
+                : 'Add invoices in the Invoices tab to track client revenue concentration.'}
             </p>
           </div>
 
@@ -1222,7 +1371,7 @@ const Reports: React.FC = () => {
                     <div className="flex items-center justify-between mt-2 text-xs font-semibold text-indigo-600">
                       <span>{profile.percentage}% of Total</span>
                       <span className="text-gray-400 font-normal">
-                        {profile.name.includes('GST') ? 'GST Invoiced' : 'Direct Service'}
+                        {profile.name.includes('Company') ? 'GST Invoiced' : 'Direct Service'}
                       </span>
                     </div>
                   </div>
@@ -1233,7 +1382,9 @@ const Reports: React.FC = () => {
             <div className="mt-4 p-3.5 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-900 flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
               <span>
-                72.8% of billings are handled under GST Registered Company profile, optimizing corporate tax write-offs and input credit.
+                {aggregates.totalIncome > 0
+                  ? `${invoiceProfileShare[0]?.percentage ?? 0}% of billings are handled under the GST Registered Company profile.`
+                  : 'No invoice billings recorded for the selected period yet.'}
               </span>
             </div>
           </div>

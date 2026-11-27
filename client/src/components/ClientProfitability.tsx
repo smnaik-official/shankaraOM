@@ -106,16 +106,26 @@ export const ClientProfitability: React.FC = () => {
   useEffect(() => {
     const handleUpdate = () => setRefreshKey((k) => k + 1);
     window.addEventListener('invoices_updated', handleUpdate);
+    window.addEventListener('clients_updated', handleUpdate);
+    window.addEventListener('credit_notes_updated', handleUpdate);
+    window.addEventListener('subscriptions_updated', handleUpdate);
+    window.addEventListener('employees_updated', handleUpdate);
     window.addEventListener('employee_allocations_updated', handleUpdate);
     window.addEventListener('client_direct_expenses_updated', handleUpdate);
     window.addEventListener('overhead_config_updated', handleUpdate);
     window.addEventListener('expenses_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
     return () => {
       window.removeEventListener('invoices_updated', handleUpdate);
+      window.removeEventListener('clients_updated', handleUpdate);
+      window.removeEventListener('credit_notes_updated', handleUpdate);
+      window.removeEventListener('subscriptions_updated', handleUpdate);
+      window.removeEventListener('employees_updated', handleUpdate);
       window.removeEventListener('employee_allocations_updated', handleUpdate);
       window.removeEventListener('client_direct_expenses_updated', handleUpdate);
       window.removeEventListener('overhead_config_updated', handleUpdate);
       window.removeEventListener('expenses_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
     };
   }, []);
 

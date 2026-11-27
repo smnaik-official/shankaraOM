@@ -156,7 +156,7 @@ const Expenses: React.FC = () => {
   const [categories, setCategories] = useState<string[]>(['Payroll', 'Office', 'IT', 'Operations', 'Meals', 'Travel', 'Marketing']);
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [typeFilter, setTypeFilter] = useState<'All' | 'Recurring' | 'One-Time'>('All');
-  const [dateFilter, setDateFilter] = useState<string>('This Month');
+  const [dateFilter, setDateFilter] = useState<string>('Maximum');
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
 
@@ -238,8 +238,8 @@ const Expenses: React.FC = () => {
     const recurringPercentage =
       totalExpense > 0
         ? Math.round((recurringExpenseLogged / totalExpense) * 100)
-        : overviewTimeRange === 'THIS_MONTH'
-          ? Math.round((totalMonthlyCommitment / (totalExpense + totalMonthlyCommitment)) * 100)
+        : overviewTimeRange === 'THIS_MONTH' && totalMonthlyCommitment > 0
+          ? 100
           : 0;
 
     const oneTimePercentage =
@@ -282,7 +282,7 @@ const Expenses: React.FC = () => {
         color: categoryColorMap[cat] || '#6B7280',
       }));
 
-    // Forecasted Expense
+    // Forecasted Expense computed strictly from actual recorded expenses & recurring commitments
     let forecastAmount = 0;
     let forecastSubtitle = '';
     let forecastBadge = 'Projected Run-rate';
@@ -290,31 +290,40 @@ const Expenses: React.FC = () => {
     switch (overviewTimeRange) {
       case 'THIS_MONTH':
         forecastAmount = totalExpense + (recurringExpenseLogged === 0 ? totalMonthlyCommitment : pendingRecurringForMonth);
-        if (forecastAmount < totalMonthlyCommitment + 8500) {
-          forecastAmount = totalMonthlyCommitment + 8500;
-        }
-        forecastSubtitle = `Commitments (${formatCurrency(totalMonthlyCommitment)}) + Nov variable trend`;
+        forecastSubtitle =
+          forecastAmount > 0
+            ? `Commitments (${formatCurrency(totalMonthlyCommitment)}) + logged spend`
+            : 'No expenses or commitments recorded';
         forecastBadge = 'Month-End Run-rate';
         break;
       case 'LAST_MONTH':
-        forecastAmount = 225000;
-        forecastSubtitle = `Closed at ${formatCurrency(totalExpense)} (99.6% forecast precision)`;
-        forecastBadge = 'Target Realized';
+        forecastAmount = totalExpense;
+        forecastSubtitle =
+          totalExpense > 0 ? `Closed at ${formatCurrency(totalExpense)}` : 'No expenses recorded last month';
+        forecastBadge = 'Actual Closed';
         break;
       case 'LAST_QUARTER':
-        forecastAmount = totalMonthlyCommitment * 3 + 25500; // ~₹6,82,500
-        forecastSubtitle = `Quarterly run-rate (${formatCurrency(totalMonthlyCommitment * 3)} base commitments)`;
+        forecastAmount = totalExpense > 0 ? totalExpense : totalMonthlyCommitment * 3;
+        forecastSubtitle =
+          totalMonthlyCommitment > 0
+            ? `Quarterly run-rate (${formatCurrency(totalMonthlyCommitment * 3)} base commitments)`
+            : 'Based on recorded quarterly expenses';
         forecastBadge = 'Quarterly Run-rate';
         break;
       case 'THIS_YEAR':
-        forecastAmount = (totalMonthlyCommitment + 8500) * 12; // ~₹27,30,000
-        forecastSubtitle = `Annualized pacing for FY 2026 across 12 months`;
+        forecastAmount =
+          totalMonthlyCommitment > 0 ? totalMonthlyCommitment * 12 + oneTimeExpenseLogged : totalExpense;
+        forecastSubtitle =
+          totalMonthlyCommitment > 0
+            ? 'Annualized pacing for FY 2026 across 12 months'
+            : 'Based on recorded FY 2026 expenses';
         forecastBadge = 'Annual Pacing';
         break;
       case 'LAST_YEAR':
-        forecastAmount = 2600000;
-        forecastSubtitle = `Closed at ${formatCurrency(totalExpense)} (0.8% under target budget)`;
-        forecastBadge = 'FY25 Budget Target';
+        forecastAmount = totalExpense;
+        forecastSubtitle =
+          totalExpense > 0 ? `Closed at ${formatCurrency(totalExpense)}` : 'No expenses recorded for FY 2025';
+        forecastBadge = 'Actual Closed';
         break;
     }
 

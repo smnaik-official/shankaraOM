@@ -34,21 +34,12 @@ import { getStoredClients } from './ClientList';
 import { getStoredProposals, calculatePipelineMetrics } from '../data/proposals';
 import { formatDateDMY } from '../utils/date';
 
-// 6-Month financial trend matching the business scale
-const monthlyTrendData = [
-  { month: 'Jun 26', revenue: 72000, expenses: 38000, profit: 34000 },
-  { month: 'Jul 26', revenue: 78500, expenses: 41200, profit: 37300 },
-  { month: 'Aug 26', revenue: 84080, expenses: 39500, profit: 44580 },
-  { month: 'Sep 26', revenue: 81000, expenses: 42000, profit: 39000 },
-  { month: 'Oct 26', revenue: 88500, expenses: 43500, profit: 45000 },
-  { month: 'Nov 26', revenue: 94780, expenses: 44200, profit: 50580 },
-];
-
 const CustomChartTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    const revenue = payload.find((p: any) => p.dataKey === 'revenue')?.value || 0;
-    const profit = payload.find((p: any) => p.dataKey === 'profit')?.value || 0;
-    const expenses = payload.find((p: any) => p.dataKey === 'expenses')?.value || 0;
+    const row = payload[0]?.payload || {};
+    const revenue = row.revenue ?? payload.find((p: any) => p.dataKey === 'revenue')?.value ?? 0;
+    const profit = row.profit ?? payload.find((p: any) => p.dataKey === 'profit')?.value ?? 0;
+    const expenses = row.expenses ?? 0;
 
     return (
       <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-lg text-xs space-y-1.5 min-w-[170px]">
@@ -145,9 +136,33 @@ const Dashboard: React.FC = () => {
       .reduce((sum, inv) => sum + inv.amount, 0);
   }, [invoices]);
 
-  const totalAllInvoices = companyInvoiceTotal + personalInvoiceTotal || 1;
-  const companyPercent = Math.round((companyInvoiceTotal / totalAllInvoices) * 100);
-  const personalPercent = 100 - companyPercent;
+  const totalAllInvoices = companyInvoiceTotal + personalInvoiceTotal;
+  const companyPercent = totalAllInvoices > 0 ? Math.round((companyInvoiceTotal / totalAllInvoices) * 100) : 0;
+  const personalPercent = totalAllInvoices > 0 ? 100 - companyPercent : 0;
+
+  // Dynamic 6-month trend computed from actual invoices & expenses
+  const monthlyTrendData = useMemo(() => {
+    const now = new Date();
+    const months: { month: string; revenue: number; expenses: number; profit: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${d.toLocaleDateString('en-US', { month: 'short' })} ${String(d.getFullYear()).slice(-2)}`;
+      const revenue = invoices
+        .filter((inv) => inv.status !== 'Cancelled' && (inv.date || '').startsWith(ym))
+        .reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
+      const monthExp = expenses
+        .filter((exp) => (exp.date || '').startsWith(ym))
+        .reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+      months.push({
+        month: label,
+        revenue,
+        expenses: monthExp,
+        profit: revenue - monthExp,
+      });
+    }
+    return months;
+  }, [invoices, expenses]);
 
   // Credit notes total
   const totalCredited = useMemo(() => {

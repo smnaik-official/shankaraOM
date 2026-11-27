@@ -41,7 +41,7 @@ export interface AdLedgerEntry {
 
 const STORAGE_KEY_AD_LEDGER = 'shankara_ad_ledger_data';
 
-const getStoredAdLedger = (): AdLedgerEntry[] => {
+export const getStoredAdLedger = (): AdLedgerEntry[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_AD_LEDGER);
     if (!raw) return [];
