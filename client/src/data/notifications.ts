@@ -93,12 +93,13 @@ export const getActiveNotifications = (targetMonth: string = '2026-11'): AlertNo
 
       if (!alreadyGenerated) {
         const notifId = `notif-inv-${template.id}-${targetMonth}`;
+        const templateTotal = Number(template.total) || 0;
         notifications.push({
           id: notifId,
           type: 'INVOICE_DUE',
           title: `Retainer Invoice Due: ${template.clientName}`,
-          message: `${template.title} (₹${template.total.toLocaleString()}) is scheduled for Day ${template.dayOfMonth} and is due to be raised.`,
-          amount: template.total,
+          message: `${template.title} (₹${templateTotal.toLocaleString()}) is scheduled for Day ${template.dayOfMonth} and is due to be raised.`,
+          amount: templateTotal,
           dueDate: `Day ${template.dayOfMonth} (${targetMonth})`,
           targetUrl: '/invoices?tab=recurring',
           targetLabel: 'Raise Retainer Invoice',
@@ -123,17 +124,18 @@ export const getActiveNotifications = (targetMonth: string = '2026-11'): AlertNo
       if (days <= 30) {
         const notifId = `notif-sub-${sub.id}-${sub.renewalDate}`;
         const symbol = CURRENCY_SYMBOLS[sub.currency] || '₹';
-        const ownershipLabel = sub.ownership === 'Company' ? 'Company (Self)' : `Client: ${sub.clientName}`;
+        const subAmount = Number(sub.amount) || 0;
+        const ownershipLabel = sub.ownership === 'Company' ? 'Company (Self)' : `Client: ${sub.clientName || 'Client'}`;
         const isOverdue = days < 0;
 
         notifications.push({
           id: notifId,
           type: 'SUBSCRIPTION_DUE',
           title: `Subscription Renewal: ${sub.name}`,
-          message: `${sub.billingDuration} subscription for ${ownershipLabel} (${symbol}${sub.amount.toLocaleString()}) ${
+          message: `${sub.billingDuration} subscription for ${ownershipLabel} (${symbol}${subAmount.toLocaleString()}) ${
             isOverdue ? `is overdue by ${Math.abs(days)} days!` : `renews on ${formatDateDMY(sub.renewalDate)}.`
           }`,
-          amount: sub.amount,
+          amount: subAmount,
           dueDate: formatDateDMY(sub.renewalDate),
           targetUrl: '/subscriptions',
           targetLabel: 'Manage Renewal',
@@ -211,41 +213,44 @@ export const getActiveNotifications = (targetMonth: string = '2026-11'): AlertNo
   // ==========================================
   const proposals = getStoredProposals();
   proposals.forEach((prop) => {
+    const propVal = Number(prop.tentativeValue) || 0;
+    const propCloseDate = prop.expectedCloseDate || '';
+    const propTitle = prop.serviceTitle || 'Proposal';
     if (prop.status === 'Accepted' && !prop.convertedInvoiceId) {
       const notifId = `notif-prop-accepted-${prop.id}`;
       notifications.push({
         id: notifId,
         type: 'PROPOSAL_FOLLOWUP',
         title: `Proposal Won: ${prop.clientName}`,
-        message: `Quote for ${prop.serviceTitle} (₹${prop.tentativeValue.toLocaleString()}) was accepted. Ready to raise invoice!`,
-        amount: prop.tentativeValue,
-        dueDate: prop.expectedCloseDate,
+        message: `Quote for ${propTitle} (₹${propVal.toLocaleString()}) was accepted. Ready to raise invoice!`,
+        amount: propVal,
+        dueDate: propCloseDate,
         targetUrl: '/proposals',
         targetLabel: 'Raise Invoice from Quote',
         badgeText: 'Quote Won',
         severity: 'high',
         category: 'Client Proposals',
-        timestamp: prop.expectedCloseDate,
+        timestamp: propCloseDate,
         isRead: readIds.has(notifId),
       });
     } else if (
       (prop.status === 'Under Review' || prop.status === 'Sent to Client') &&
-      prop.expectedCloseDate.startsWith(targetMonth)
+      propCloseDate.startsWith(targetMonth)
     ) {
       const notifId = `notif-prop-close-${prop.id}`;
       notifications.push({
         id: notifId,
         type: 'PROPOSAL_FOLLOWUP',
         title: `Quote Follow-up: ${prop.clientName}`,
-        message: `${prop.serviceTitle} (₹${prop.tentativeValue.toLocaleString()}) expected to close by ${prop.expectedCloseDate}.`,
-        amount: prop.tentativeValue,
-        dueDate: prop.expectedCloseDate,
+        message: `${propTitle} (₹${propVal.toLocaleString()}) expected to close by ${propCloseDate}.`,
+        amount: propVal,
+        dueDate: propCloseDate,
         targetUrl: '/proposals',
         targetLabel: 'View Proposal Pipeline',
         badgeText: 'Quote Closing',
         severity: 'medium',
         category: 'Income Forecast',
-        timestamp: prop.expectedCloseDate,
+        timestamp: propCloseDate,
         isRead: readIds.has(notifId),
       });
     }

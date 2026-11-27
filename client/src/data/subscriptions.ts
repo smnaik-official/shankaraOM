@@ -421,7 +421,22 @@ export const getStoredSubscriptions = (): Subscription[] => {
     const raw = localStorage.getItem(STORAGE_KEY_SUBSCRIPTIONS);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    const todayStr = new Date().toISOString().slice(0, 10);
+    return parsed.map((s: any) => ({
+      ...s,
+      name: s.name || s.toolName || 'Subscription',
+      category: s.category || 'SaaS & Software',
+      ownership: s.ownership || 'Company',
+      billingDuration: s.billingDuration || s.duration || 'Monthly',
+      amount: Number(s.amount ?? s.pricing ?? 0),
+      currency: s.currency || 'INR',
+      startDate: s.startDate || todayStr,
+      renewalDate: s.renewalDate || s.nextDueDate || todayStr,
+      autoRenew: s.autoRenew ?? true,
+      notes: s.notes || s.description || '',
+      status: s.status || 'Active',
+    }));
   } catch (e) {
     return [];
   }

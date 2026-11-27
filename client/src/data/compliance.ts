@@ -62,7 +62,7 @@ export const computeItemStatus = (
   item: ComplianceItem,
   todayStr: string = '2026-11-23'
 ): { status: ComplianceStatus; daysOverdue: number; daysUntilDue: number } => {
-  if (item.filingDetails?.filedDate) {
+  if (item.filingDetails?.filedDate || String(item.status || '').toLowerCase() === 'completed') {
     return { status: 'completed', daysOverdue: 0, daysUntilDue: 0 };
   }
 
@@ -627,21 +627,60 @@ export const DEFAULT_COMPLIANCES: ComplianceItem[] = [
 /**
  * Storage helpers
  */
+const normalizeComplianceCategory = (rawCat: string): ComplianceCategory => {
+  const valid: ComplianceCategory[] = ['GST', 'TDS', 'INCOME_TAX', 'MCA_LLP', 'PAYROLL_PT', 'PERSONAL_FINANCE', 'OTHER'];
+  if (valid.includes(rawCat as ComplianceCategory)) return rawCat as ComplianceCategory;
+  const upper = (rawCat || '').toUpperCase();
+  if (upper.includes('GST')) return 'GST';
+  if (upper.includes('TDS') || upper.includes('TCS')) return 'TDS';
+  if (upper.includes('TAX') || upper.includes('ITR')) return 'INCOME_TAX';
+  if (upper.includes('MCA') || upper.includes('LLP')) return 'MCA_LLP';
+  if (upper.includes('PT') || upper.includes('PAYROLL')) return 'PAYROLL_PT';
+  return 'OTHER';
+};
+
 export const getStoredCompliances = (): ComplianceItem[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_COMPLIANCES);
-    let items: ComplianceItem[] = [];
+    let items: any[] = [];
     if (raw) {
       const parsed = JSON.parse(raw);
       items = Array.isArray(parsed) ? parsed : [];
     }
 
-    // Always recompute dynamic status against current date
+    // Always recompute dynamic status against current date & normalize legacy records
     const todayStr = '2026-11-23';
-    return items.map((item) => {
-      const { status, daysOverdue, daysUntilDue } = computeItemStatus(item, todayStr);
+    return items.map((rawItem) => {
+      const entity: ComplianceEntity =
+        rawItem.entity === 'individual' ||
+        String(rawItem.applicableFor || '').toLowerCase().includes('individual')
+          ? 'individual'
+          : 'company';
+
+      const normalized: ComplianceItem = {
+        ...rawItem,
+        title: rawItem.title || 'Compliance Item',
+        code: rawItem.code || rawItem.category || 'STATUTORY',
+        entity,
+        entityName:
+          rawItem.entityName ||
+          rawItem.applicableFor ||
+          (entity === 'company' ? 'M/s Shankara Online Solutions LLP' : 'Manjunath Naik S'),
+        category: normalizeComplianceCategory(rawItem.category),
+        frequency: rawItem.frequency || 'monthly',
+        dueDate: rawItem.dueDate || todayStr,
+        periodCovered: rawItem.periodCovered || '',
+        statutoryAct: rawItem.statutoryAct || 'Statutory Compliance',
+        description: rawItem.description || rawItem.notes || '',
+        statutoryLateFeesOrPenalty: rawItem.statutoryLateFeesOrPenalty || '',
+        portalName: rawItem.portalName || 'Official Portal',
+        portalUrl: rawItem.portalUrl || '',
+        status: (String(rawItem.status || 'pending').toLowerCase() as ComplianceStatus) || 'pending',
+      };
+
+      const { status, daysOverdue, daysUntilDue } = computeItemStatus(normalized, todayStr);
       return {
-        ...item,
+        ...normalized,
         status,
         daysOverdue,
         daysUntilDue,

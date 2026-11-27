@@ -212,13 +212,35 @@ export const getStoredProposals = (): Proposal[] => {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.map((p: any) => ({
-        ...p,
-        quotationNumber: p.quotationNumber
-          ? p.quotationNumber.replace(/^QUO\/(\d{4}-\d{2})\/(\d+)$/i, (_m: string, fy: string, seq: string) => `QUO/${seq.padStart(4, '0')}/${fy}`)
-          : p.quotationNumber,
-        status: normalizeProposalStatus(p.status),
-      }));
+      const todayStr = new Date().toISOString().slice(0, 10);
+      return parsed.map((p: any) => {
+        const closeDate = p.expectedCloseDate || p.targetCloseDate || todayStr;
+        const sentDate = p.sentDate || p.targetCloseDate || todayStr;
+        return {
+          ...p,
+          clientName: p.clientName || 'Unknown Client',
+          contactPerson: p.contactPerson || '',
+          email: p.email || '',
+          phone: p.phone || '',
+          location: p.location || '',
+          serviceTitle: p.serviceTitle || p.title || 'Untitled Proposal',
+          serviceDescription: p.serviceDescription || p.scopeOfWork || '',
+          tentativeValue: Number(p.tentativeValue ?? p.monthlyRetainer ?? 0),
+          billingType: p.billingType || 'Monthly Retainer',
+          billingEntity: p.billingEntity || 'COMPANY',
+          probability: Number(p.probability ?? 50),
+          sentDate,
+          expectedCloseDate: closeDate,
+          validUntil: p.validUntil || closeDate,
+          notes: p.notes || '',
+          createdAt: p.createdAt || sentDate,
+          updatedAt: p.updatedAt || sentDate,
+          quotationNumber: p.quotationNumber
+            ? p.quotationNumber.replace(/^QUO\/(\d{4}-\d{2})\/(\d+)$/i, (_m: string, fy: string, seq: string) => `QUO/${seq.padStart(4, '0')}/${fy}`)
+            : p.quotationNumber,
+          status: normalizeProposalStatus(p.status),
+        };
+      });
     }
     return [];
   } catch (e) {
@@ -267,33 +289,33 @@ export const calculatePipelineMetrics = (
   const sentToClientCount = proposals.filter((p) => p.status === 'Sent to Client').length;
   const underReviewCount = proposals.filter((p) => p.status === 'Under Review').length;
 
-  const totalPipelineValue = activeProposals.reduce((sum, p) => sum + p.tentativeValue, 0);
+  const totalPipelineValue = activeProposals.reduce((sum, p) => sum + (Number(p.tentativeValue) || 0), 0);
   const weightedForecastValue = Math.round(
-    activeProposals.reduce((sum, p) => sum + (p.tentativeValue * p.probability) / 100, 0)
+    activeProposals.reduce((sum, p) => sum + ((Number(p.tentativeValue) || 0) * (Number(p.probability) || 0)) / 100, 0)
   );
 
-  const wonValue = wonProposals.reduce((sum, p) => sum + p.tentativeValue, 0);
-  const lostValue = lostProposals.reduce((sum, p) => sum + p.tentativeValue, 0);
+  const wonValue = wonProposals.reduce((sum, p) => sum + (Number(p.tentativeValue) || 0), 0);
+  const lostValue = lostProposals.reduce((sum, p) => sum + (Number(p.tentativeValue) || 0), 0);
   const totalDecided = wonProposals.length + lostProposals.length;
   const winRate = totalDecided > 0 ? Math.round((wonProposals.length / totalDecided) * 100) : 0;
 
   // This Month (e.g. 2026-11)
-  const thisMonthDeals = activeProposals.filter((p) => p.expectedCloseDate.startsWith(currentMonth));
+  const thisMonthDeals = activeProposals.filter((p) => (p.expectedCloseDate || '').startsWith(currentMonth));
   const thisMonthForecastValue = Math.round(
-    thisMonthDeals.reduce((sum, p) => sum + (p.tentativeValue * p.probability) / 100, 0)
+    thisMonthDeals.reduce((sum, p) => sum + ((Number(p.tentativeValue) || 0) * (Number(p.probability) || 0)) / 100, 0)
   );
 
   // By Billing Entity
   const companyForecastValue = Math.round(
     activeProposals
       .filter((p) => p.billingEntity === 'COMPANY')
-      .reduce((sum, p) => sum + (p.tentativeValue * p.probability) / 100, 0)
+      .reduce((sum, p) => sum + ((Number(p.tentativeValue) || 0) * (Number(p.probability) || 0)) / 100, 0)
   );
 
   const personalForecastValue = Math.round(
     activeProposals
       .filter((p) => p.billingEntity === 'PERSONAL')
-      .reduce((sum, p) => sum + (p.tentativeValue * p.probability) / 100, 0)
+      .reduce((sum, p) => sum + ((Number(p.tentativeValue) || 0) * (Number(p.probability) || 0)) / 100, 0)
   );
 
   // Group by status
@@ -304,20 +326,21 @@ export const calculatePipelineMetrics = (
     const list = proposals.filter((p) => p.status === s);
     byStatus[s] = {
       count: list.length,
-      totalValue: list.reduce((sum, p) => sum + p.tentativeValue, 0),
-      weightedValue: Math.round(list.reduce((sum, p) => sum + (p.tentativeValue * p.probability) / 100, 0)),
+      totalValue: list.reduce((sum, p) => sum + (Number(p.tentativeValue) || 0), 0),
+      weightedValue: Math.round(list.reduce((sum, p) => sum + ((Number(p.tentativeValue) || 0) * (Number(p.probability) || 0)) / 100, 0)),
     };
   });
 
   // Group monthly forecasts
   const monthMap: Record<string, { rawTotal: number; weightedTotal: number; dealCount: number }> = {};
   activeProposals.forEach((p) => {
-    const m = p.expectedCloseDate.slice(0, 7); // YYYY-MM
+    const m = (p.expectedCloseDate || '').slice(0, 7); // YYYY-MM
+    if (!m) return;
     if (!monthMap[m]) {
       monthMap[m] = { rawTotal: 0, weightedTotal: 0, dealCount: 0 };
     }
-    monthMap[m].rawTotal += p.tentativeValue;
-    monthMap[m].weightedTotal += Math.round((p.tentativeValue * p.probability) / 100);
+    monthMap[m].rawTotal += Number(p.tentativeValue) || 0;
+    monthMap[m].weightedTotal += Math.round(((Number(p.tentativeValue) || 0) * (Number(p.probability) || 0)) / 100);
     monthMap[m].dealCount += 1;
   });
 

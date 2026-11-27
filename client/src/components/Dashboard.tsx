@@ -77,6 +77,7 @@ const Dashboard: React.FC = () => {
   const [clients, setClients] = useState(() => getStoredClients());
   const [creditNotes, setCreditNotes] = useState(() => getStoredCreditNotes());
   const [expenses, setExpenses] = useState(() => getStoredExpenses());
+  const [proposals, setProposals] = useState(() => getStoredProposals());
 
   useEffect(() => {
     const refresh = () => {
@@ -85,6 +86,7 @@ const Dashboard: React.FC = () => {
       setClients(getStoredClients());
       setCreditNotes(getStoredCreditNotes());
       setExpenses(getStoredExpenses());
+      setProposals(getStoredProposals());
     };
     const events = [
       'invoices_updated',
@@ -158,7 +160,6 @@ const Dashboard: React.FC = () => {
   }, [invoices]);
 
   // Proposals & Income Forecasting Pipeline
-  const proposals = useMemo(() => getStoredProposals(), []);
   const proposalMetrics = useMemo(() => calculatePipelineMetrics(proposals, '2026-11'), [proposals]);
 
   const currentDateFormatted = formatDateDMY(new Date());
